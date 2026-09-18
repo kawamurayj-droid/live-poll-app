@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ライブ投票</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.2.2/wordcloud2.min.js"></script>
+<style>
+/* ============ トークン ============ */
+:root{
+  --ink:#F4F1E9;
+  --ink-dim:#B9BFC9;
+  --bg:#161B22;
+  --bg-panel:#1F2630;
+  --bg-panel2:#26303C;
+  --line:#333E4B;
+  --gold:#F2B84B;
+  --gold-dim:#8A6A2C;
+  --teal:#4FB6A8;
+  --coral:#E2725B;
+  --plum:#9B84C4;
+  --sage:#8FB06B;
+  --sky:#6FA8DC;
+  --danger:#E2725B;
+  --radius:14px;
+  --font-head:'Zen Maru Gothic', 'Zen Kaku Gothic New', sans-serif;
+  --font-body:'Zen Kaku Gothic New', sans-serif;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--font-body);
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3{font-family:var(--font-head); margin:0;}
+button{font-family:var(--font-body); cursor:pointer;}
+.hidden{display:none !important;}
+.screen{
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:32px 20px;
+}
+.card{
+  width:100%;
+  max-width:480px;
+  background:var(--bg-panel);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:32px 28px;
+}
+.card-wide{max-width:960px;}
+.eyebrow{color:var(--ink-dim); font-size:14px; margin-bottom:6px;}
+.field{margin-bottom:18px;}
+.field label{display:block; font-size:14px; color:var(--ink-dim); margin-bottom:6px;}
+input[type=text], input[type=number], input[type=password], textarea, select{
+  width:100%;
+  background:var(--bg-panel2);
+  border:1px solid var(--line);
+  border-radius:10px;
+  color:var(--ink);
+  padding:12px 14px;
+  font-size:16px;
+  font-family:var(--font-body);
+}
+textarea{resize:vertical; min-height:70px;}
+input:focus, textarea:focus, select:focus, button:focus-visible{
+  outline:2px solid var(--gold); outline-offset:2px;
+}
+.btn{
+  display:inline-flex; align-items:center; justify-content:center;
+  border:none; border-radius:10px;
+  padding:13px 22px; font-size:16px; font-weight:700;
+  color:#1B2129; background:var(--gold);
+  transition:transform .12s ease;
+}
+.btn:active{transform:scale(.97);}
+.btn-ghost{
+  background:transparent; color:var(--ink); border:1px solid var(--line);
+  font-weight:500;
+}
+.btn-danger{background:var(--coral); color:#1B2129;}
+.btn-block{width:100%;}
+.btn-row{display:flex; gap:10px; flex-wrap:wrap;}
+.muted{color:var(--ink-dim); font-size:14px;}
+.big-code{
+  font-family:var(--font-head); font-weight:900;
+  font-size:64px; letter-spacing:12px; color:var(--gold);
+  text-align:center; margin:6px 0 2px;
+}
+a.link{color:var(--sky);}
+
+/* ---- 教員：設問作成カード ---- */
+.qcard{
+  background:var(--bg-panel2); border:1px solid var(--line); border-radius:12px;
+  padding:18px; margin-bottom:14px; position:relative;
+}
+.qcard .qnum{
+  position:absolute; top:-10px; left:14px; background:var(--gold); color:#1B2129;
+  font-weight:700; font-size:12px; padding:2px 10px; border-radius:20px;
+}
+.qcard .remove{
+  position:absolute; top:10px; right:10px; background:none; border:none;
+  color:var(--ink-dim); font-size:18px;
+}
+.type-pills{display:flex; gap:8px; margin-bottom:10px;}
+.pill{
+  border:1px solid var(--line); border-radius:20px; padding:6px 14px; font-size:13px;
+  background:var(--bg-panel); color:var(--ink-dim);
+}
+.pill.active{background:var(--gold); color:#1B2129; border-color:var(--gold); font-weight:700;}
+
+/* ---- 教員：コントロール画面 ---- */
+.control-wrap{width:100%; max-width:1100px; padding:24px 16px;}
+.control-top{
+  display:flex; justify-content:space-between; align-items:flex-start; gap:16px;
+  flex-wrap:wrap; margin-bottom:18px;
+}
+.join-chip{
+  background:var(--bg-panel); border:1px solid var(--line); border-radius:12px;
+  padding:10px 18px; display:flex; align-items:center; gap:12px;
+}
+.join-chip .code{font-family:var(--font-head); font-weight:900; font-size:26px; color:var(--gold); letter-spacing:4px;}
+.grid-2{display:grid; grid-template-columns:280px 1fr; gap:18px;}
+@media (max-width:780px){.grid-2{grid-template-columns:1fr;}}
+.qlist{background:var(--bg-panel); border:1px solid var(--line); border-radius:var(--radius); padding:10px; max-height:70vh; overflow-y:auto;}
+.qitem{
+  padding:12px; border-radius:10px; margin-bottom:6px; cursor:pointer;
+  border:1px solid transparent; font-size:14px;
+}
+.qitem:hover{background:var(--bg-panel2);}
+.qitem.active{background:var(--gold-dim); border-color:var(--gold); font-weight:700;}
+.qitem .qtype-tag{font-size:11px; color:var(--ink-dim); display:block; margin-top:2px;}
+.stage{
+  background:var(--bg-panel); border:1px solid var(--line); border-radius:var(--radius);
+  padding:26px; min-height:420px; display:flex; flex-direction:column;
+}
+.stage h2{font-size:22px; margin-bottom:18px; line-height:1.4;}
+.stage-meta{display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;}
+.count-badge{
+  background:var(--bg-panel2); border:1px solid var(--line); border-radius:20px;
+  padding:6px 14px; font-size:13px; color:var(--ink-dim);
+}
+.chart-area{flex:1; position:relative; min-height:280px;}
+.numeric-stats{display:flex; gap:24px; margin-bottom:16px; flex-wrap:wrap;}
+.stat{background:var(--bg-panel2); border-radius:10px; padding:12px 18px; min-width:110px;}
+.stat .n{font-family:var(--font-head); font-size:28px; font-weight:900; color:var(--gold);}
+.stat .l{font-size:12px; color:var(--ink-dim);}
+#wordcloud-canvas{width:100%; height:100%;}
+.empty-state{margin:auto; text-align:center; color:var(--ink-dim);}
+
+/* ---- 学生画面 ---- */
+.student-q{font-size:20px; line-height:1.5; margin-bottom:22px;}
+.choice-btn{
+  display:block; width:100%; text-align:left; background:var(--bg-panel2);
+  border:1px solid var(--line); border-radius:12px; padding:16px 18px; margin-bottom:10px;
+  color:var(--ink); font-size:16px;
+}
+.choice-btn:active, .choice-btn.selected{background:var(--gold); color:#1B2129; border-color:var(--gold); font-weight:700;}
+.waiting-dot{
+  width:10px; height:10px; border-radius:50%; background:var(--gold); display:inline-block;
+  animation:pulse 1.2s infinite ease-in-out; margin:0 3px;
+}
+.waiting-dot:nth-child(2){animation-delay:.2s;}
+.waiting-dot:nth-child(3){animation-delay:.4s;}
+@keyframes pulse{0%,80%,100%{opacity:.25; transform:scale(.8);} 40%{opacity:1; transform:scale(1);}}
+.top-title{text-align:center; margin-bottom:28px;}
+.top-title .kicker{color:var(--ink-dim); font-size:14px; letter-spacing:1px; margin-bottom:6px;}
+.top-title h1{font-size:26px;}
+.footer-link{margin-top:20px; text-align:center;}
+</style>
+</head>
+<body>
+
+<!-- ============================================================ -->
+<!-- 学生：参加画面                                                -->
+<!-- ============================================================ -->
+<div id="view-join" class="screen">
+  <div class="top-title">
+    <div class="kicker">LIVE POLL</div>
+    <h1>参加コードを入力</h1>
+  </div>
+  <div class="card">
+    <div class="field">
+      <label for="join-code-input">4桁のコード</label>
+      <input type="text" id="join-code-input" inputmode="numeric" maxlength="4" placeholder="例）3821" style="font-size:28px; letter-spacing:8px; text-align:center;">
+    </div>
+    <button class="btn btn-block" id="join-btn">参加する</button>
+    <p id="join-error" class="muted" style="color:var(--coral); margin-top:10px;"></p>
+  </div>
+  <div class="footer-link"><a class="link" href="#teacher">教員はこちら</a></div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 学生：待機・回答・完了画面                                     -->
+<!-- ============================================================ -->
+<div id="view-student" class="screen hidden">
+  <div class="card">
+    <div id="student-waiting" class="hidden" style="text-align:center;">
+      <p class="muted">次の設問をお待ちください</p>
+      <p><span class="waiting-dot"></span><span class="waiting-dot"></span><span class="waiting-dot"></span></p>
+    </div>
+
+    <div id="student-question" class="hidden">
+      <p class="eyebrow" id="student-qtype-label"></p>
+      <div class="student-q" id="student-qtext"></div>
+
+      <div id="student-choice-area"></div>
+
+      <div id="student-text-area" class="hidden">
+        <textarea id="student-text-input" placeholder="一言・短いフレーズで入力してください"></textarea>
+        <button class="btn btn-block" style="margin-top:12px;" id="student-text-submit">送信する</button>
+      </div>
+
+      <div id="student-numeric-area" class="hidden">
+        <input type="number" id="student-numeric-input" placeholder="数値を入力">
+        <button class="btn btn-block" style="margin-top:12px;" id="student-numeric-submit">送信する</button>
+      </div>
+    </div>
+
+    <div id="student-done" class="hidden" style="text-align:center;">
+      <p style="font-size:40px; margin-bottom:6px;">✓</p>
+      <p>回答を送信しました</p>
+      <p class="muted">次の設問が表示されるまでお待ちください</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 教員：PIN認証                                                 -->
+<!-- ============================================================ -->
+<div id="view-teacher-pin" class="screen hidden">
+  <div class="top-title">
+    <div class="kicker">TEACHER</div>
+    <h1>教員用PIN</h1>
+  </div>
+  <div class="card">
+    <div class="field">
+      <input type="password" id="teacher-pin-input" inputmode="numeric" maxlength="6" placeholder="PINコード" style="font-size:22px; letter-spacing:6px; text-align:center;">
+    </div>
+    <button class="btn btn-block" id="teacher-pin-btn">ログイン</button>
+    <p id="teacher-pin-error" class="muted" style="color:var(--coral); margin-top:10px;"></p>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 教員：投票セットアップ                                         -->
+<!-- ============================================================ -->
+<div id="view-teacher-setup" class="screen hidden">
+  <div class="card card-wide">
+    <h1 style="margin-bottom:4px;">新しい投票を作成</h1>
+    <p class="muted" style="margin-bottom:22px;">設問はあとから並び替えできません。順番に注意して追加してください。</p>
+
+    <div class="field">
+      <label>投票のタイトル（講義名など）</label>
+      <input type="text" id="setup-title" placeholder="例）社会参画 第5回">
+    </div>
+
+    <div id="setup-questions"></div>
+
+    <button class="btn btn-ghost btn-block" id="setup-add-q" style="margin-bottom:22px;">＋ 設問を追加</button>
+
+    <div class="btn-row">
+      <button class="btn" id="setup-start-btn">投票を開始する</button>
+      <a class="btn btn-ghost" href="#teacher-history">保存済みの投票一覧</a>
+    </div>
+    <p id="setup-error" class="muted" style="color:var(--coral); margin-top:10px;"></p>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 教員：過去の投票一覧                                           -->
+<!-- ============================================================ -->
+<div id="view-teacher-history" class="screen hidden">
+  <div class="card card-wide">
+    <h1 style="margin-bottom:18px;">保存済みの投票</h1>
+    <div id="history-list"></div>
+    <div class="btn-row" style="margin-top:18px;">
+      <a class="btn btn-ghost" href="#teacher-setup">＋ 新しい投票を作成</a>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 教員：コントロール画面（投影用）                                -->
+<!-- ============================================================ -->
+<div id="view-teacher-control" class="screen hidden" style="justify-content:flex-start;">
+  <div class="control-wrap">
+    <div class="control-top">
+      <div>
+        <div class="eyebrow" id="control-title"></div>
+        <div class="join-chip">
+          <span class="muted">参加コード</span>
+          <span class="code" id="control-code"></span>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-ghost" id="control-reset-btn">この設問の回答をリセット</button>
+        <a class="btn btn-ghost" href="#teacher-setup">終了する</a>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="qlist" id="control-qlist"></div>
+
+      <div class="stage">
+        <div class="stage-meta">
+          <span class="eyebrow" id="stage-type-label"></span>
+          <span class="count-badge" id="stage-count">0件の回答</span>
+        </div>
+        <h2 id="stage-qtext"></h2>
+        <div id="stage-numeric-stats" class="numeric-stats hidden"></div>
+        <div class="chart-area">
+          <canvas id="chart-canvas" class="hidden"></canvas>
+          <div id="wordcloud-canvas" class="hidden" style="position:relative;"><canvas id="wc-inner-canvas"></canvas></div>
+          <div id="stage-empty" class="empty-state">まだ回答がありません</div>
+        </div>
+        <div class="btn-row" style="margin-top:16px;">
+          <button class="btn btn-ghost" id="stage-prev-btn">← 前の設問</button>
+          <button class="btn" id="stage-next-btn">次の設問 →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   Firebase 設定
+   ここを、あなたが作成した Firebase プロジェクトの設定に置き換えてください。
+   Firebase コンソール → プロジェクトの設定 → マイアプリ から取得できます。
+   Realtime Database を有効化しておく必要があります。
+   ========================================================================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyD9nqwsYiU7ugAN327wlEVBpUMgyc3qOP0",
+  authDomain: "live-poll-e9158.firebaseapp.com",
+  databaseURL: "https://live-poll-e9158-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "live-poll-e9158",
+  storageBucket: "live-poll-e9158.firebasestorage.app",
+  messagingSenderId: "21210603208",
+  appId: "1:21210603208:web:ee82d1dc163306b45b0ffd"
+};
+
+/* 教員用PIN（必要に応じて変更してください） */
+const TEACHER_PIN = "1234";
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+/* =========================================================================
+   共通ユーティリティ
+   ========================================================================= */
+function $(id){ return document.getElementById(id); }
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(el => el.classList.add('hidden'));
+  $(id).classList.remove('hidden');
+}
+function genCode(){
+  return String(Math.floor(1000 + Math.random() * 9000));
+}
+const QUESTION_TYPES = [
+  {key:'choice', label:'選択式'},
+  {key:'text', label:'自由記述（ワードクラウド）'},
+  {key:'numeric', label:'数値回答'}
+];
+const CHART_COLORS = ['#F2B84B','#4FB6A8','#E2725B','#9B84C4','#8FB06B','#6FA8DC'];
+
+/* =========================================================================
+   ルーター
+   #                     → 学生：参加画面
+   #student?code=XXXX    → 学生：回答画面（参加コード確定後）
+   #teacher              → 教員：PIN認証
+   #teacher-setup        → 教員：新規作成
+   #teacher-history      → 教員：保存済み一覧
+   #teacher-control?code=XXXX → 教員：コントロール画面
+   ========================================================================= */
+let studentState = { code:null, currentQId:null, answeredFor:null };
+let controlState = { code:null, sessionData:null, chart:null, wc:null };
+
+function parseHash(){
+  const raw = location.hash.replace('#','');
+  const [path, query] = raw.split('?');
+  const params = new URLSearchParams(query || '');
+  return { path: path || '', params };
+}
+
+window.addEventListener('hashchange', route);
+window.addEventListener('DOMContentLoaded', route);
+
+function route(){
+  const { path, params } = parseHash();
+
+  teardownListeners();
+
+  if (path === '' ) {
+    showScreen('view-join');
+  } else if (path === 'student') {
+    const code = params.get('code');
+    if (!code) { location.hash = ''; return; }
+    enterStudentSession(code);
+  } else if (path === 'teacher') {
+    if (sessionStorage.getItem('teacherAuthed') === '1') {
+      location.hash = 'teacher-setup';
+    } else {
+      showScreen('view-teacher-pin');
+    }
+  } else if (path === 'teacher-setup') {
+    if (!requireTeacherAuth()) return;
+    renderSetupScreen();
+  } else if (path === 'teacher-history') {
+    if (!requireTeacherAuth()) return;
+    renderHistoryScreen();
+  } else if (path === 'teacher-control') {
+    if (!requireTeacherAuth()) return;
+    const code = params.get('code');
+    if (!code) { location.hash = 'teacher-history'; return; }
+    enterControlScreen(code);
+  }
+}
+
+function requireTeacherAuth(){
+  if (sessionStorage.getItem('teacherAuthed') !== '1') {
+    location.hash = 'teacher';
+    return false;
+  }
+  return true;
+}
+
+let activeFirebaseRefs = [];
+function teardownListeners(){
+  activeFirebaseRefs.forEach(({ref, cb}) => ref.off('value', cb));
+  activeFirebaseRefs = [];
+  if (controlState.chart) { controlState.chart.destroy(); controlState.chart = null; }
+}
+
+/* =========================================================================
+   学生：参加コード入力
+   ========================================================================= */
+$('join-btn').addEventListener('click', () => {
+  const code = $('join-code-input').value.trim();
+  if (!/^\d{4}$/.test(code)) {
+    $('join-error').textContent = '4桁のコードを入力してください。';
+    return;
+  }
+  db.ref('sessions/' + code).once('value').then(snap => {
+    if (!snap.exists()) {
+      $('join-error').textContent = 'そのコードの投票が見つかりません。';
+      return;
+    }
+    location.hash = 'student?code=' + code;
+  });
+});
+$('join-code-input').addEventListener('keydown', e => { if (e.key === 'Enter') $('join-btn').click(); });
+
+/* =========================================================================
+   学生：回答フロー
+   ========================================================================= */
+function enterStudentSession(code){
+  studentState.code = code;
+  showScreen('view-student');
+
+  const sessionRef = db.ref('sessions/' + code);
+  const cb = snap => {
+    const data = snap.val();
+    if (!data) { location.hash = ''; return; }
+    renderStudentQuestion(code, data);
+  };
+  sessionRef.on('value', cb);
+  activeFirebaseRefs.push({ref: sessionRef, cb});
+}
+
+function renderStudentQuestion(code, data){
+  const qId = data.activeQuestion;
+  const wait = $('student-waiting'), qView = $('student-question'), done = $('student-done');
+  wait.classList.add('hidden'); qView.classList.add('hidden'); done.classList.add('hidden');
+
+  if (!qId || !data.questions || !data.questions[qId]) {
+    wait.classList.remove('hidden');
+    return;
+  }
+
+  const answeredKey = 'answered_' + code + '_' + qId;
+  if (localStorage.getItem(answeredKey)) {
+    done.classList.remove('hidden');
+    return;
+  }
+
+  const q = data.questions[qId];
+  studentState.currentQId = qId;
+  qView.classList.remove('hidden');
+
+  const typeLabel = QUESTION_TYPES.find(t => t.key === q.type)?.label || '';
+  $('student-qtype-label').textContent = typeLabel;
+  $('student-qtext').textContent = q.text;
+
+  const choiceArea = $('student-choice-area');
+  const textArea = $('student-text-area');
+  const numArea = $('student-numeric-area');
+  choiceArea.classList.add('hidden'); textArea.classList.add('hidden'); numArea.classList.add('hidden');
+  choiceArea.innerHTML = '';
+
+  if (q.type === 'choice') {
+    choiceArea.classList.remove('hidden');
+    (q.options || []).forEach((opt, idx) => {
+      const btn = document.createElement('button');
+      btn.className = 'choice-btn';
+      btn.textContent = opt;
+      btn.addEventListener('click', () => submitStudentAnswer(code, qId, idx));
+      choiceArea.appendChild(btn);
+    });
+  } else if (q.type === 'text') {
+    textArea.classList.remove('hidden');
+    $('student-text-input').value = '';
+  } else if (q.type === 'numeric') {
+    numArea.classList.remove('hidden');
+    $('student-numeric-input').value = '';
+  }
+}
+
+$('student-text-submit').addEventListener('click', () => {
+  const val = $('student-text-input').value.trim();
+  if (!val) return;
+  submitStudentAnswer(studentState.code, studentState.currentQId, val);
+});
+$('student-numeric-submit').addEventListener('click', () => {
+  const val = parseFloat($('student-numeric-input').value);
+  if (isNaN(val)) return;
+  submitStudentAnswer(studentState.code, studentState.currentQId, val);
+});
+
+function submitStudentAnswer(code, qId, value){
+  const answeredKey = 'answered_' + code + '_' + qId;
+  if (localStorage.getItem(answeredKey)) return;
+  db.ref('responses/' + code + '/' + qId).push({ value: value, ts: firebase.database.ServerValue.TIMESTAMP })
+    .then(() => {
+      localStorage.setItem(answeredKey, '1');
+      $('student-question').classList.add('hidden');
+      $('student-done').classList.remove('hidden');
+    });
+}
+
+/* =========================================================================
+   教員：PIN認証
+   ========================================================================= */
+$('teacher-pin-btn').addEventListener('click', () => {
+  if ($('teacher-pin-input').value === TEACHER_PIN) {
+    sessionStorage.setItem('teacherAuthed', '1');
+    location.hash = 'teacher-setup';
+  } else {
+    $('teacher-pin-error').textContent = 'PINが違います。';
+  }
+});
+$('teacher-pin-input').addEventListener('keydown', e => { if (e.key === 'Enter') $('teacher-pin-btn').click(); });
+
+/* =========================================================================
+   教員：新規セットアップ画面
+   ========================================================================= */
+let setupQuestions = [];
+
+function renderSetupScreen(){
+  showScreen('view-teacher-setup');
+  $('setup-title').value = '';
+  $('setup-error').textContent = '';
+  setupQuestions = [ makeBlankQuestion() ];
+  renderSetupQuestionList();
+}
+
+function makeBlankQuestion(){
+  return { type:'choice', text:'', options:['',''] };
+}
+
+function renderSetupQuestionList(){
+  const wrap = $('setup-questions');
+  wrap.innerHTML = '';
+  setupQuestions.forEach((q, i) => {
+    const el = document.createElement('div');
+    el.className = 'qcard';
+    el.innerHTML = `
+      <span class="qnum">設問 ${i + 1}</span>
+      ${setupQuestions.length > 1 ? '<button class="remove" data-i="' + i + '">✕</button>' : ''}
+      <div class="type-pills" data-role="pills"></div>
+      <div class="field" style="margin-bottom:10px;">
+        <textarea data-role="qtext" placeholder="設問文を入力">${q.text}</textarea>
+      </div>
+      <div data-role="type-body"></div>
+    `;
+    wrap.appendChild(el);
+
+    const pillsWrap = el.querySelector('[data-role="pills"]');
+    QUESTION_TYPES.forEach(t => {
+      const p = document.createElement('button');
+      p.className = 'pill' + (q.type === t.key ? ' active' : '');
+      p.textContent = t.label;
+      p.addEventListener('click', () => {
+        q.type = t.key;
+        if (t.key === 'choice' && !q.options) q.options = ['',''];
+        renderSetupQuestionList();
+      });
+      pillsWrap.appendChild(p);
+    });
+
+    el.querySelector('[data-role="qtext"]').addEventListener('input', e => { q.text = e.target.value; });
+
+    const removeBtn = el.querySelector('.remove');
+    if (removeBtn) removeBtn.addEventListener('click', () => {
+      setupQuestions.splice(i, 1);
+      renderSetupQuestionList();
+    });
+
+    const bodyWrap = el.querySelector('[data-role="type-body"]');
+    if (q.type === 'choice') {
+      bodyWrap.innerHTML = '<label class="muted" style="display:block; margin-bottom:6px;">選択肢（1行に1つ）</label>';
+      const ta = document.createElement('textarea');
+      ta.value = (q.options || []).join('\n');
+      ta.placeholder = '選択肢A\n選択肢B\n選択肢C';
+      ta.addEventListener('input', e => { q.options = e.target.value.split('\n'); });
+      bodyWrap.appendChild(ta);
+    } else if (q.type === 'text') {
+      bodyWrap.innerHTML = '<p class="muted">学生には一言・短いフレーズでの回答を促してください。同じ回答が多いほど大きく表示されます。</p>';
+    } else if (q.type === 'numeric') {
+      bodyWrap.innerHTML = '<p class="muted">平均値と分布のヒストグラムが表示されます。</p>';
+    }
+  });
+}
+
+$('setup-add-q').addEventListener('click', () => {
+  setupQuestions.push(makeBlankQuestion());
+  renderSetupQuestionList();
+});
+
+$('setup-start-btn').addEventListener('click', () => {
+  const title = $('setup-title').value.trim() || '無題の投票';
+  const cleaned = setupQuestions
+    .map(q => ({
+      type: q.type,
+      text: q.text.trim(),
+      options: q.type === 'choice' ? (q.options || []).map(o => o.trim()).filter(Boolean) : null
+    }))
+    .filter(q => q.text && (q.type !== 'choice' || q.options.length >= 2));
+
+  if (cleaned.length === 0) {
+    $('setup-error').textContent = '設問文（選択式は選択肢2つ以上）を入力してください。';
+    return;
+  }
+
+  const questionsObj = {};
+  cleaned.forEach((q, i) => {
+    questionsObj['q' + i] = { ...q, order: i };
+  });
+
+  createSessionWithUniqueCode(title, questionsObj);
+});
+
+function createSessionWithUniqueCode(title, questionsObj){
+  const code = genCode();
+  db.ref('sessions/' + code).once('value').then(snap => {
+    if (snap.exists()) { createSessionWithUniqueCode(title, questionsObj); return; }
+    db.ref('sessions/' + code).set({
+      title: title,
+      createdAt: firebase.database.ServerValue.TIMESTAMP,
+      activeQuestion: 'q0',
+      questions: questionsObj
+    }).then(() => {
+      location.hash = 'teacher-control?code=' + code;
+    });
+  });
+}
+
+/* =========================================================================
+   教員：過去の投票一覧
+   ========================================================================= */
+function renderHistoryScreen(){
+  showScreen('view-teacher-history');
+  const list = $('history-list');
+  list.innerHTML = '<p class="muted">読み込み中…</p>';
+  db.ref('sessions').orderByChild('createdAt').limitToLast(30).once('value').then(snap => {
+    const items = [];
+    snap.forEach(child => { items.push({ code: child.key, ...child.val() }); });
+    items.reverse();
+    if (items.length === 0) {
+      list.innerHTML = '<p class="muted">まだ投票がありません。</p>';
+      return;
+    }
+    list.innerHTML = '';
+    items.forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'qcard';
+      row.style.cursor = 'pointer';
+      const date = item.createdAt ? new Date(item.createdAt).toLocaleString('ja-JP') : '';
+      row.innerHTML = `<strong>${escapeHtml(item.title || '無題')}</strong>
+        <div class="muted" style="margin-top:4px;">コード: ${item.code} ／ ${date}</div>`;
+      row.addEventListener('click', () => { location.hash = 'teacher-control?code=' + item.code; });
+      list.appendChild(row);
+    });
+  });
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* =========================================================================
+   教員：コントロール画面
+   ========================================================================= */
+function enterControlScreen(code){
+  controlState.code = code;
+  showScreen('view-teacher-control');
+  $('control-code').textContent = code;
+
+  const sessionRef = db.ref('sessions/' + code);
+  const cb = snap => {
+    const data = snap.val();
+    if (!data) { location.hash = 'teacher-history'; return; }
+    controlState.sessionData = data;
+    $('control-title').textContent = data.title || '';
+    renderQList(code, data);
+    renderStage(code, data);
+  };
+  sessionRef.on('value', cb);
+  activeFirebaseRefs.push({ref: sessionRef, cb});
+}
+
+function renderQList(code, data){
+  const wrap = $('control-qlist');
+  wrap.innerHTML = '';
+  const qEntries = Object.entries(data.questions || {}).sort((a,b) => a[1].order - b[1].order);
+  qEntries.forEach(([qId, q], i) => {
+    const el = document.createElement('div');
+    const isActive = data.activeQuestion === qId;
+    el.className = 'qitem' + (isActive ? ' active' : '');
+    const typeLabel = QUESTION_TYPES.find(t => t.key === q.type)?.label || '';
+    /* 投影中に学生へ次の設問が見えてしまわないよう，表示中の設問だけ本文を出す */
+    const label = isActive ? escapeHtml(q.text) : `設問 ${i + 1}`;
+    el.innerHTML = `${label}<span class="qtype-tag">${typeLabel}</span>`;
+    el.addEventListener('click', () => setActiveQuestion(code, qId));
+    wrap.appendChild(el);
+  });
+}
+
+function setActiveQuestion(code, qId){
+  db.ref('sessions/' + code + '/activeQuestion').set(qId);
+}
+
+$('stage-next-btn').addEventListener('click', () => {
+  const { code, sessionData } = controlState;
+  const ids = Object.entries(sessionData.questions).sort((a,b) => a[1].order - b[1].order).map(e => e[0]);
+  const idx = ids.indexOf(sessionData.activeQuestion);
+  if (idx < ids.length - 1) setActiveQuestion(code, ids[idx + 1]);
+});
+$('stage-prev-btn').addEventListener('click', () => {
+  const { code, sessionData } = controlState;
+  const ids = Object.entries(sessionData.questions).sort((a,b) => a[1].order - b[1].order).map(e => e[0]);
+  const idx = ids.indexOf(sessionData.activeQuestion);
+  if (idx > 0) setActiveQuestion(code, ids[idx - 1]);
+});
+$('control-reset-btn').addEventListener('click', () => {
+  const { code, sessionData } = controlState;
+  if (!sessionData.activeQuestion) return;
+  if (!confirm('この設問の回答をすべて削除します。よろしいですか？')) return;
+  db.ref('responses/' + code + '/' + sessionData.activeQuestion).remove();
+});
+
+let stageResponsesRef = null, stageResponsesCb = null;
+
+function renderStage(code, data){
+  const qId = data.activeQuestion;
+  const q = data.questions ? data.questions[qId] : null;
+
+  if (stageResponsesRef) { stageResponsesRef.off('value', stageResponsesCb); }
+
+  if (!q) {
+    $('stage-qtext').textContent = '設問が選択されていません';
+    $('stage-type-label').textContent = '';
+    $('stage-count').textContent = '0件の回答';
+    return;
+  }
+
+  $('stage-qtext').textContent = q.text;
+  $('stage-type-label').textContent = QUESTION_TYPES.find(t => t.key === q.type)?.label || '';
+
+  stageResponsesRef = db.ref('responses/' + code + '/' + qId);
+  stageResponsesCb = snap => {
+    const responses = [];
+    snap.forEach(child => responses.push(child.val().value));
+    $('stage-count').textContent = responses.length + '件の回答';
+    renderChartForType(q, responses);
+  };
+  stageResponsesRef.on('value', stageResponsesCb);
+}
+
+function renderChartForType(q, responses){
+  const canvas = $('chart-canvas');
+  const wcWrap = $('wordcloud-canvas');
+  const numStats = $('stage-numeric-stats');
+  const empty = $('stage-empty');
+  canvas.classList.add('hidden'); wcWrap.classList.add('hidden'); numStats.classList.add('hidden');
+  if (controlState.chart) { controlState.chart.destroy(); controlState.chart = null; }
+
+  if (responses.length === 0) {
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+
+  if (q.type === 'choice') {
+    canvas.classList.remove('hidden');
+    const counts = (q.options || []).map((_, i) => responses.filter(r => r === i).length);
+    controlState.chart = new Chart(canvas.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: q.options,
+        datasets: [{ data: counts, backgroundColor: CHART_COLORS }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#F4F1E9', font: { size: 14 } }, grid: { color: '#333E4B' } },
+          y: { beginAtZero: true, ticks: { color: '#B9BFC9', stepSize: 1 }, grid: { color: '#333E4B' } }
+        }
+      }
+    });
+  } else if (q.type === 'numeric') {
+    numStats.classList.remove('hidden');
+    const nums = responses.map(Number).filter(n => !isNaN(n));
+    const avg = nums.reduce((a,b) => a+b, 0) / nums.length;
+    numStats.innerHTML = `
+      <div class="stat"><div class="n">${avg.toFixed(1)}</div><div class="l">平均</div></div>
+      <div class="stat"><div class="n">${Math.min(...nums)}</div><div class="l">最小</div></div>
+      <div class="stat"><div class="n">${Math.max(...nums)}</div><div class="l">最大</div></div>
+      <div class="stat"><div class="n">${nums.length}</div><div class="l">回答数</div></div>
+    `;
+    canvas.classList.remove('hidden');
+    const min = Math.min(...nums), max = Math.max(...nums);
+    const bucketCount = Math.min(10, Math.max(4, Math.ceil(Math.sqrt(nums.length))));
+    const span = (max - min) || 1;
+    const bucketSize = span / bucketCount;
+    const buckets = new Array(bucketCount).fill(0);
+    nums.forEach(n => {
+      let idx = Math.floor((n - min) / bucketSize);
+      if (idx >= bucketCount) idx = bucketCount - 1;
+      if (idx < 0) idx = 0;
+      buckets[idx]++;
+    });
+    const labels = buckets.map((_, i) => (min + i * bucketSize).toFixed(1));
+    controlState.chart = new Chart(canvas.getContext('2d'), {
+      type: 'bar',
+      data: { labels, datasets: [{ data: buckets, backgroundColor: '#4FB6A8' }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#F4F1E9', font: { size: 12 } }, grid: { color: '#333E4B' } },
+          y: { beginAtZero: true, ticks: { color: '#B9BFC9', stepSize: 1 }, grid: { color: '#333E4B' } }
+        }
+      }
+    });
+  } else if (q.type === 'text') {
+    wcWrap.classList.remove('hidden');
+    const counts = {};
+    responses.forEach(r => {
+      const key = String(r).trim();
+      if (!key) return;
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    const list = Object.entries(counts).map(([text, n]) => [text, n * 12 + 10]);
+    const wcCanvas = $('wc-inner-canvas');
+    const stageArea = wcWrap.parentElement;
+    wcCanvas.width = stageArea.clientWidth;
+    wcCanvas.height = stageArea.clientHeight || 300;
+    WordCloud(wcCanvas, {
+      list: list,
+      gridSize: 8,
+      weightFactor: 1,
+      fontFamily: "'Zen Kaku Gothic New', sans-serif",
+      color: (word, weight, fontSize, distance, theta) => CHART_COLORS[Math.floor(Math.random() * CHART_COLORS.length)],
+      backgroundColor: 'transparent',
+      rotateRatio: 0
+    });
+  }
+}
+</script>
+</body>
+</html>

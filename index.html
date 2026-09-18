@@ -14,20 +14,21 @@
 <style>
 /* ============ トークン ============ */
 :root{
-  --ink:#F4F1E9;
-  --ink-dim:#B9BFC9;
-  --bg:#161B22;
-  --bg-panel:#1F2630;
-  --bg-panel2:#26303C;
-  --line:#333E4B;
-  --gold:#F2B84B;
-  --gold-dim:#8A6A2C;
-  --teal:#4FB6A8;
-  --coral:#E2725B;
-  --plum:#9B84C4;
-  --sage:#8FB06B;
-  --sky:#6FA8DC;
-  --danger:#E2725B;
+  --ink:#20242B;
+  --ink-dim:#565F6B;
+  --bg:#F4F2EC;
+  --bg-panel:#FFFFFF;
+  --bg-panel2:#EEEAE0;
+  --line:#D8D2C3;
+  --gold:#C98A2A;
+  --gold-text:#8A5D1D;
+  --gold-dim:#F3E2BE;
+  --teal:#2F9C8F;
+  --coral:#D1573E;
+  --plum:#7C63B0;
+  --sage:#5F8F44;
+  --sky:#3E7FBF;
+  --danger:#D1573E;
   --radius:14px;
   --font-head:'Zen Maru Gothic', 'Zen Kaku Gothic New', sans-serif;
   --font-body:'Zen Kaku Gothic New', sans-serif;
@@ -90,13 +91,13 @@ input:focus, textarea:focus, select:focus, button:focus-visible{
   background:transparent; color:var(--ink); border:1px solid var(--line);
   font-weight:500;
 }
-.btn-danger{background:var(--coral); color:#1B2129;}
+.btn-danger{background:var(--coral); color:#FFFFFF;}
 .btn-block{width:100%;}
 .btn-row{display:flex; gap:10px; flex-wrap:wrap;}
 .muted{color:var(--ink-dim); font-size:14px;}
 .big-code{
   font-family:var(--font-head); font-weight:900;
-  font-size:64px; letter-spacing:12px; color:var(--gold);
+  font-size:64px; letter-spacing:12px; color:var(--gold-text);
   text-align:center; margin:6px 0 2px;
 }
 a.link{color:var(--sky);}
@@ -131,7 +132,7 @@ a.link{color:var(--sky);}
   background:var(--bg-panel); border:1px solid var(--line); border-radius:12px;
   padding:10px 18px; display:flex; align-items:center; gap:12px;
 }
-.join-chip .code{font-family:var(--font-head); font-weight:900; font-size:26px; color:var(--gold); letter-spacing:4px;}
+.join-chip .code{font-family:var(--font-head); font-weight:900; font-size:26px; color:var(--gold-text); letter-spacing:4px;}
 .grid-2{display:grid; grid-template-columns:280px 1fr; gap:18px;}
 @media (max-width:780px){.grid-2{grid-template-columns:1fr;}}
 .qlist{background:var(--bg-panel); border:1px solid var(--line); border-radius:var(--radius); padding:10px; max-height:70vh; overflow-y:auto;}
@@ -155,7 +156,7 @@ a.link{color:var(--sky);}
 .chart-area{flex:1; position:relative; min-height:280px;}
 .numeric-stats{display:flex; gap:24px; margin-bottom:16px; flex-wrap:wrap;}
 .stat{background:var(--bg-panel2); border-radius:10px; padding:12px 18px; min-width:110px;}
-.stat .n{font-family:var(--font-head); font-size:28px; font-weight:900; color:var(--gold);}
+.stat .n{font-family:var(--font-head); font-size:28px; font-weight:900; color:var(--gold-text);}
 .stat .l{font-size:12px; color:var(--ink-dim);}
 #wordcloud-canvas{width:100%; height:100%;}
 .empty-state{margin:auto; text-align:center; color:var(--ink-dim);}
@@ -374,7 +375,7 @@ const QUESTION_TYPES = [
   {key:'text', label:'自由記述（ワードクラウド）'},
   {key:'numeric', label:'数値回答'}
 ];
-const CHART_COLORS = ['#F2B84B','#4FB6A8','#E2725B','#9B84C4','#8FB06B','#6FA8DC'];
+const CHART_COLORS = ['#C98A2A','#2F9C8F','#D1573E','#7C63B0','#5F8F44','#3E7FBF'];
 
 /* =========================================================================
    ルーター
@@ -826,8 +827,8 @@ function renderChartForType(q, responses){
         responsive: true, maintainAspectRatio: false,
         plugins: { legend: { display: false } },
         scales: {
-          x: { ticks: { color: '#F4F1E9', font: { size: 14 } }, grid: { color: '#333E4B' } },
-          y: { beginAtZero: true, ticks: { color: '#B9BFC9', stepSize: 1 }, grid: { color: '#333E4B' } }
+          x: { ticks: { color: '#20242B', font: { size: 14 } }, grid: { color: '#E4E0D4' } },
+          y: { beginAtZero: true, ticks: { color: '#565F6B', stepSize: 1 }, grid: { color: '#E4E0D4' } }
         }
       }
     });
@@ -856,13 +857,13 @@ function renderChartForType(q, responses){
     const labels = buckets.map((_, i) => (min + i * bucketSize).toFixed(1));
     controlState.chart = new Chart(canvas.getContext('2d'), {
       type: 'bar',
-      data: { labels, datasets: [{ data: buckets, backgroundColor: '#4FB6A8' }] },
+      data: { labels, datasets: [{ data: buckets, backgroundColor: '#2F9C8F' }] },
       options: {
         responsive: true, maintainAspectRatio: false,
         plugins: { legend: { display: false } },
         scales: {
-          x: { ticks: { color: '#F4F1E9', font: { size: 12 } }, grid: { color: '#333E4B' } },
-          y: { beginAtZero: true, ticks: { color: '#B9BFC9', stepSize: 1 }, grid: { color: '#333E4B' } }
+          x: { ticks: { color: '#20242B', font: { size: 12 } }, grid: { color: '#E4E0D4' } },
+          y: { beginAtZero: true, ticks: { color: '#565F6B', stepSize: 1 }, grid: { color: '#E4E0D4' } }
         }
       }
     });

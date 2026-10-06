@@ -270,7 +270,7 @@ a.link{color:var(--sky);}
 <div id="view-teacher-setup" class="screen hidden">
   <div class="card card-wide">
     <h1 style="margin-bottom:4px;">新しい投票を作成</h1>
-    <p class="muted" style="margin-bottom:22px;">設問はあとから並び替えできません。順番に注意して追加してください。</p>
+    <p class="muted" style="margin-bottom:22px;">各設問の右上の▲▼で順番を入れ替えられます。</p>
 
     <div class="field">
       <label>投票のタイトル（講義名など）</label>
@@ -790,9 +790,14 @@ function renderSetupQuestionList(){
   setupQuestions.forEach((q, i) => {
     const el = document.createElement('div');
     el.className = 'qcard';
+    el.style.position = 'relative';
     el.innerHTML = `
       <span class="qnum">設問 ${i + 1}</span>
-      ${setupQuestions.length > 1 ? '<button class="remove" data-i="' + i + '">✕</button>' : ''}
+      <div style="position:absolute; top:8px; right:10px; display:flex; gap:4px; align-items:center;">
+        <button class="move-up" data-i="${i}" title="上に移動" ${i === 0 ? 'disabled' : ''} style="background:none; border:none; color:var(--ink-dim); font-size:16px; cursor:pointer; padding:2px 6px;">▲</button>
+        <button class="move-down" data-i="${i}" title="下に移動" ${i === setupQuestions.length - 1 ? 'disabled' : ''} style="background:none; border:none; color:var(--ink-dim); font-size:16px; cursor:pointer; padding:2px 6px;">▼</button>
+        ${setupQuestions.length > 1 ? '<button class="remove" data-i="' + i + '" style="position:static;">✕</button>' : ''}
+      </div>
       <div class="type-pills" data-role="pills"></div>
       <div class="field" style="margin-bottom:10px;">
         <textarea data-role="qtext" placeholder="設問文を入力">${q.text}</textarea>
@@ -800,6 +805,19 @@ function renderSetupQuestionList(){
       <div data-role="type-body"></div>
     `;
     wrap.appendChild(el);
+
+    const upBtn = el.querySelector('.move-up');
+    if (upBtn) upBtn.addEventListener('click', () => {
+      if (i === 0) return;
+      [setupQuestions[i - 1], setupQuestions[i]] = [setupQuestions[i], setupQuestions[i - 1]];
+      renderSetupQuestionList();
+    });
+    const downBtn = el.querySelector('.move-down');
+    if (downBtn) downBtn.addEventListener('click', () => {
+      if (i === setupQuestions.length - 1) return;
+      [setupQuestions[i + 1], setupQuestions[i]] = [setupQuestions[i], setupQuestions[i + 1]];
+      renderSetupQuestionList();
+    });
 
     const pillsWrap = el.querySelector('[data-role="pills"]');
     QUESTION_TYPES.forEach(t => {
@@ -913,11 +931,24 @@ function renderHistoryScreen(){
     items.forEach(item => {
       const row = document.createElement('div');
       row.className = 'qcard';
-      row.style.cursor = 'pointer';
+      row.style.cssText = 'position:relative; cursor:pointer; padding-right:120px;';
       const date = item.createdAt ? new Date(item.createdAt).toLocaleString('ja-JP') : '';
       row.innerHTML = `<strong>${escapeHtml(item.title || '無題')}</strong>
-        <div class="muted" style="margin-top:4px;">コード: ${item.code} ／ ${date}</div>`;
-      row.addEventListener('click', () => { location.hash = 'teacher-control?code=' + item.code; });
+        <div class="muted" style="margin-top:4px;">コード: ${item.code} ／ ${date}</div>
+        <button class="btn-danger history-delete" data-code="${item.code}"
+          style="position:absolute; top:14px; right:14px; padding:7px 14px; font-size:13px; border:none; border-radius:10px;">削除</button>`;
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('.history-delete')) return;
+        location.hash = 'teacher-control?code=' + item.code;
+      });
+      row.querySelector('.history-delete').addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!confirm(`「${item.title || '無題'}」（コード: ${item.code}）を削除します。回答データも含めて完全に削除され，元に戻せません。よろしいですか？`)) return;
+        Promise.all([
+          db.ref('sessions/' + item.code).remove(),
+          db.ref('responses/' + item.code).remove()
+        ]).then(() => renderHistoryScreen());
+      });
       list.appendChild(row);
     });
   });

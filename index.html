@@ -236,6 +236,14 @@ a.link{color:var(--sky);}
       <p>回答を送信しました</p>
       <p class="muted">次の設問が表示されるまでお待ちください</p>
     </div>
+
+    <div id="student-allmode" class="hidden"></div>
+
+    <div id="student-allmode-done" class="hidden" style="text-align:center;">
+      <p style="font-size:40px; margin-bottom:6px;">✓</p>
+      <p>すべての設問に回答しました</p>
+      <p class="muted">ありがとうございました</p>
+    </div>
   </div>
 </div>
 
@@ -267,6 +275,12 @@ a.link{color:var(--sky);}
     <div class="field">
       <label>投票のタイトル（講義名など）</label>
       <input type="text" id="setup-title" placeholder="例）社会参画 第5回">
+    </div>
+
+    <div class="field">
+      <label>進行モード</label>
+      <div class="type-pills" id="setup-mode-pills"></div>
+      <p class="muted" id="setup-mode-desc" style="margin-top:8px;"></p>
     </div>
 
     <div id="setup-questions"></div>
@@ -302,6 +316,7 @@ a.link{color:var(--sky);}
     <div class="control-top">
       <div>
         <div class="eyebrow" id="control-title"></div>
+        <p class="muted" id="control-mode-label" style="margin:2px 0 10px;"></p>
         <div class="join-chip">
           <span class="muted">参加コード</span>
           <span class="code" id="control-code"></span>
@@ -487,9 +502,17 @@ function enterStudentSession(code){
 }
 
 function renderStudentQuestion(code, data){
-  const qId = data.activeQuestion;
   const wait = $('student-waiting'), qView = $('student-question'), done = $('student-done');
+  const allView = $('student-allmode'), allDone = $('student-allmode-done');
   wait.classList.add('hidden'); qView.classList.add('hidden'); done.classList.add('hidden');
+  allView.classList.add('hidden'); allDone.classList.add('hidden');
+
+  if (data.mode === 'all') {
+    renderStudentAllMode(code, data);
+    return;
+  }
+
+  const qId = data.activeQuestion;
 
   if (!qId || !data.questions || !data.questions[qId]) {
     wait.classList.remove('hidden');
@@ -561,6 +584,134 @@ function renderStudentQuestion(code, data){
   }
 }
 
+/* =========================================================================
+   学生：まとめて配信モード（全設問を1画面に並べ，各自好きな順に回答）
+   ========================================================================= */
+function renderStudentAllMode(code, data){
+  const allView = $('student-allmode');
+  const allDone = $('student-allmode-done');
+  const qEntries = Object.entries(data.questions || {}).sort((a,b) => a[1].order - b[1].order);
+
+  const allAnswered = qEntries.every(([qId]) => localStorage.getItem('answered_' + code + '_' + qId));
+  if (allAnswered && qEntries.length > 0) {
+    allDone.classList.remove('hidden');
+    return;
+  }
+  allView.classList.remove('hidden');
+  allView.innerHTML = '';
+
+  qEntries.forEach(([qId, q], idx) => {
+    const answeredKey = 'answered_' + code + '_' + qId;
+    const isAnswered = !!localStorage.getItem(answeredKey);
+
+    const card = document.createElement('div');
+    card.className = 'qcard';
+    card.style.marginBottom = '14px';
+
+    const head = document.createElement('p');
+    head.className = 'eyebrow';
+    head.textContent = `設問${idx + 1}・${typeLabelFor(q)}`;
+    card.appendChild(head);
+
+    const qtext = document.createElement('div');
+    qtext.className = 'student-q';
+    qtext.style.fontSize = '16px';
+    qtext.style.marginBottom = '14px';
+    qtext.textContent = q.text;
+    card.appendChild(qtext);
+
+    if (isAnswered) {
+      const done = document.createElement('p');
+      done.style.cssText = 'color:var(--teal); font-weight:700; margin:0;';
+      done.textContent = '✓ 回答済み';
+      card.appendChild(done);
+      allView.appendChild(card);
+      return;
+    }
+
+    if (q.type === 'choice') {
+      if (q.multiple) {
+        const selected = new Set();
+        const hint = document.createElement('p');
+        hint.className = 'muted';
+        hint.style.margin = '0 0 10px';
+        hint.textContent = '当てはまるものをすべて選んでください';
+        card.appendChild(hint);
+        const btns = [];
+        (q.options || []).forEach((opt, oi) => {
+          const btn = document.createElement('button');
+          btn.className = 'choice-btn';
+          btn.textContent = opt;
+          btn.addEventListener('click', () => {
+            if (selected.has(oi)) { selected.delete(oi); btn.classList.remove('selected'); }
+            else { selected.add(oi); btn.classList.add('selected'); }
+          });
+          btns.push(btn);
+          card.appendChild(btn);
+        });
+        const submitBtn = document.createElement('button');
+        submitBtn.className = 'btn btn-block';
+        submitBtn.style.marginTop = '8px';
+        submitBtn.textContent = '送信する';
+        submitBtn.addEventListener('click', () => {
+          if (selected.size === 0) return;
+          submitAllModeAnswer(code, qId, Array.from(selected).sort((a,b) => a - b));
+        });
+        card.appendChild(submitBtn);
+      } else {
+        (q.options || []).forEach((opt, oi) => {
+          const btn = document.createElement('button');
+          btn.className = 'choice-btn';
+          btn.textContent = opt;
+          btn.addEventListener('click', () => submitAllModeAnswer(code, qId, oi));
+          card.appendChild(btn);
+        });
+      }
+    } else if (q.type === 'text') {
+      const ta = document.createElement('textarea');
+      ta.placeholder = '一言・短いフレーズで入力してください';
+      card.appendChild(ta);
+      const submitBtn = document.createElement('button');
+      submitBtn.className = 'btn btn-block';
+      submitBtn.style.marginTop = '12px';
+      submitBtn.textContent = '送信する';
+      submitBtn.addEventListener('click', () => {
+        const val = ta.value.trim();
+        if (!val) return;
+        submitAllModeAnswer(code, qId, val);
+      });
+      card.appendChild(submitBtn);
+    } else if (q.type === 'numeric') {
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.placeholder = '数値を入力';
+      card.appendChild(input);
+      const submitBtn = document.createElement('button');
+      submitBtn.className = 'btn btn-block';
+      submitBtn.style.marginTop = '12px';
+      submitBtn.textContent = '送信する';
+      submitBtn.addEventListener('click', () => {
+        const val = parseFloat(input.value);
+        if (isNaN(val)) return;
+        submitAllModeAnswer(code, qId, val);
+      });
+      card.appendChild(submitBtn);
+    }
+
+    allView.appendChild(card);
+  });
+}
+
+function submitAllModeAnswer(code, qId, value){
+  const answeredKey = 'answered_' + code + '_' + qId;
+  if (localStorage.getItem(answeredKey)) return;
+  db.ref('responses/' + code + '/' + qId).push({ value: value, ts: firebase.database.ServerValue.TIMESTAMP })
+    .then(() => {
+      localStorage.setItem(answeredKey, '1');
+      db.ref('sessions/' + code).once('value').then(snap => renderStudentAllMode(code, snap.val()));
+    });
+}
+
 $('student-text-submit').addEventListener('click', () => {
   const val = $('student-text-input').value.trim();
   if (!val) return;
@@ -600,13 +751,33 @@ $('teacher-pin-input').addEventListener('keydown', e => { if (e.key === 'Enter')
    教員：新規セットアップ画面
    ========================================================================= */
 let setupQuestions = [];
+let setupMode = 'sequential';
+const POLL_MODES = [
+  {key:'sequential', label:'一問ずつ出題', desc:'教員が「次の設問へ」を押すまで，学生にはその設問しか表示されません。進行は教員のペースに合わせられます。'},
+  {key:'all', label:'まとめて配信', desc:'開始と同時に全設問が学生に公開され，各自好きな順番・ペースで回答できます（アンケート形式）。'}
+];
 
 function renderSetupScreen(){
   showScreen('view-teacher-setup');
   $('setup-title').value = '';
   $('setup-error').textContent = '';
   setupQuestions = [ makeBlankQuestion() ];
+  setupMode = 'sequential';
+  renderSetupModePills();
   renderSetupQuestionList();
+}
+
+function renderSetupModePills(){
+  const wrap = $('setup-mode-pills');
+  wrap.innerHTML = '';
+  POLL_MODES.forEach(m => {
+    const p = document.createElement('button');
+    p.className = 'pill' + (setupMode === m.key ? ' active' : '');
+    p.textContent = m.label;
+    p.addEventListener('click', () => { setupMode = m.key; renderSetupModePills(); });
+    wrap.appendChild(p);
+  });
+  $('setup-mode-desc').textContent = POLL_MODES.find(m => m.key === setupMode).desc;
 }
 
 function makeBlankQuestion(){
@@ -704,15 +875,16 @@ $('setup-start-btn').addEventListener('click', () => {
     questionsObj['q' + i] = { ...q, order: i };
   });
 
-  createSessionWithUniqueCode(title, questionsObj);
+  createSessionWithUniqueCode(title, questionsObj, setupMode);
 });
 
-function createSessionWithUniqueCode(title, questionsObj){
+function createSessionWithUniqueCode(title, questionsObj, mode){
   const code = genCode();
   db.ref('sessions/' + code).once('value').then(snap => {
-    if (snap.exists()) { createSessionWithUniqueCode(title, questionsObj); return; }
+    if (snap.exists()) { createSessionWithUniqueCode(title, questionsObj, mode); return; }
     db.ref('sessions/' + code).set({
       title: title,
+      mode: mode,
       createdAt: firebase.database.ServerValue.TIMESTAMP,
       activeQuestion: 'q0',
       questions: questionsObj
@@ -769,6 +941,9 @@ function enterControlScreen(code){
     if (!data) { location.hash = 'teacher-history'; return; }
     controlState.sessionData = data;
     $('control-title').textContent = data.title || '';
+    $('control-mode-label').textContent = data.mode === 'all'
+      ? 'モード：まとめて配信（学生は全設問に自由な順で回答できます）'
+      : 'モード：一問ずつ出題';
     renderQList(code, data);
     renderStage(code, data);
   };
@@ -785,8 +960,9 @@ function renderQList(code, data){
     const isActive = data.activeQuestion === qId;
     el.className = 'qitem' + (isActive ? ' active' : '');
     const typeLabel = typeLabelFor(q);
-    /* 投影中に学生へ次の設問が見えてしまわないよう，表示中の設問だけ本文を出す */
-    const label = isActive ? escapeHtml(q.text) : `設問 ${i + 1}`;
+    /* まとめて配信モードは全設問が学生に公開済みなので隠す必要がない。
+       一問ずつモードは，投影中に学生へ次の設問が見えてしまわないよう，表示中の設問だけ本文を出す */
+    const label = (data.mode === 'all' || isActive) ? escapeHtml(q.text) : `設問 ${i + 1}`;
     el.innerHTML = `${label}<span class="qtype-tag">${typeLabel}</span>`;
     el.addEventListener('click', () => setActiveQuestion(code, qId));
     wrap.appendChild(el);
@@ -833,6 +1009,8 @@ function renderStage(code, data){
 
   $('stage-qtext').textContent = q.text;
   $('stage-type-label').textContent = typeLabelFor(q);
+  $('stage-prev-btn').textContent = data.mode === 'all' ? '← 前の結果を見る' : '← 前の設問';
+  $('stage-next-btn').textContent = data.mode === 'all' ? '次の結果を見る →' : '次の設問 →';
 
   stageResponsesRef = db.ref('responses/' + code + '/' + qId);
   stageResponsesCb = snap => {

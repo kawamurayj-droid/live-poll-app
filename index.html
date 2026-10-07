@@ -1344,7 +1344,8 @@ function renderStage(code, data){
   stageResponsesRef = db.ref('responses/' + code + '/' + qId);
   stageResponsesCb = snap => {
     const responses = [];
-    snap.forEach(child => responses.push(child.val().value));
+    /* forEach は true（truthy）を返すと列挙を打ち切るため，波括弧で戻り値を返さない */
+    snap.forEach(child => { responses.push(child.val().value); });
     $('stage-count').textContent = responses.length + '件の回答';
     controlState.lastQ = q; controlState.lastResponses = responses;
     renderChartForType(q, responses);

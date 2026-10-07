@@ -1467,6 +1467,28 @@ a.link{color:var(--sky);}
 #view-teacher-control.proj .stat .l{font-size:clamp(14px,1.4vw,22px);}
 #view-teacher-control.proj .chart-area{min-height:0;}
 #view-teacher-control.proj .empty-state{font-size:clamp(22px,2.4vw,36px);}
+#proj-collect, #proj-overview{display:none;}
+#view-teacher-control.proj.proj-collect #proj-collect{display:flex; flex:1; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:10px;}
+#view-teacher-control.proj.proj-collect .chart-area,
+#view-teacher-control.proj.proj-collect .numeric-stats{display:none !important;}
+#proj-collect .pc-n{font-family:var(--font-head); font-weight:900; color:var(--gold-text); font-size:clamp(120px,17vw,280px); line-height:1;}
+#proj-collect .pc-l{font-size:clamp(26px,3vw,46px); color:var(--ink);}
+#proj-collect .pc-hint{font-size:clamp(18px,2vw,30px); color:var(--ink-dim); margin-top:14px;}
+#view-teacher-control.proj.proj-overview #proj-overview{display:block; flex:1; overflow:auto;}
+#view-teacher-control.proj.proj-overview .stage-meta,
+#view-teacher-control.proj.proj-overview .stage h2,
+#view-teacher-control.proj.proj-overview .chart-area,
+#view-teacher-control.proj.proj-overview .numeric-stats{display:none !important;}
+#proj-overview .po-head{min-height:clamp(150px,16vw,200px); padding-right:clamp(470px,31vw,610px);}
+#proj-overview .po-title{font-family:var(--font-head); font-weight:900; font-size:clamp(30px,3.8vw,60px); margin:0 0 6px; line-height:1.3;}
+#proj-overview .po-sub{font-size:clamp(16px,1.8vw,26px); color:var(--ink-dim); margin-bottom:18px;}
+#proj-overview .po-row{display:flex; align-items:center; gap:22px; padding:14px 0; border-bottom:1px solid var(--line); font-size:clamp(22px,2.6vw,40px);}
+#proj-overview .po-no{font-family:var(--font-head); font-weight:900; color:var(--gold-text); min-width:1.6em;}
+#proj-overview .po-text{flex:1; line-height:1.35;}
+#proj-overview .po-tag{font-size:.5em; color:var(--ink-dim); background:var(--bg-panel2); border:1px solid var(--line); border-radius:20px; padding:2px 14px; white-space:nowrap;}
+#proj-overview .po-bar{width:clamp(120px,16vw,300px); height:.5em; background:var(--bg-panel2); border-radius:10px; overflow:hidden;}
+#proj-overview .po-bar > i{display:block; height:100%; background:var(--teal); border-radius:10px; transition:width .3s;}
+#proj-overview .po-n{font-family:var(--font-head); font-weight:900; min-width:3.2em; text-align:right; white-space:nowrap;}
 #proj-bar{
   position:fixed; left:50%; bottom:14px; transform:translateX(-50%); z-index:60;
   display:flex; gap:10px; align-items:center; background:rgba(32,36,43,.92); color:#fff;
@@ -1599,6 +1621,12 @@ a.link{color:var(--sky);}
       <p class="muted" id="setup-mode-desc" style="margin-top:8px;"></p>
     </div>
 
+    <div class="field">
+      <label>投影モードでの結果の見せ方</label>
+      <div class="type-pills" id="setup-reveal-pills"></div>
+      <p class="muted" id="setup-reveal-desc" style="margin-top:8px;"></p>
+    </div>
+
     <div id="setup-questions"></div>
 
     <button class="btn btn-ghost btn-block" id="setup-add-q" style="margin-bottom:22px;">＋ 設問を追加</button>
@@ -1661,6 +1689,8 @@ a.link{color:var(--sky);}
           <span class="count-badge" id="stage-count">0件の回答</span>
         </div>
         <h2 id="stage-qtext"></h2>
+        <div id="proj-collect"><div class="pc-n" id="proj-collect-n">0</div><div class="pc-l">件の回答</div><div class="pc-hint">スマートフォンから回答してください（結果は次のページで表示します）</div></div>
+        <div id="proj-overview"></div>
         <div id="stage-numeric-stats" class="numeric-stats hidden"></div>
         <div class="chart-area">
           <canvas id="chart-canvas" class="hidden"></canvas>
@@ -2084,9 +2114,15 @@ $('teacher-pin-input').addEventListener('keydown', e => { if (e.key === 'Enter')
    ========================================================================= */
 let setupQuestions = [];
 let setupMode = 'sequential';
+let setupReveal = 'hide';
 const POLL_MODES = [
   {key:'sequential', label:'一問ずつ出題', desc:'教員が「次の設問へ」を押すまで，学生にはその設問しか表示されません。進行は教員のペースに合わせられます。'},
   {key:'all', label:'まとめて配信', desc:'開始と同時に全設問が学生に公開され，各自好きな順番・ペースで回答できます（アンケート形式）。'}
+];
+
+const REVEAL_OPTS = [
+  {key:'hide', label:'回答中は結果を隠す', desc:'投影モードで，回答を集めている間は結果を映しません。一問ずつ出題では「設問と回答数」→「結果」の順，まとめて配信では1ページ目に回答状況の一覧，2ページ目以降に結果を映します。'},
+  {key:'show', label:'すぐに結果を表示', desc:'投影モードで，最初のページから結果（グラフ）を映します。回答が増える様子をそのまま見せたいときに向いています。'}
 ];
 
 let setupEditCode = null;
@@ -2117,8 +2153,10 @@ function renderSetupScreen(editCode){
     $('setup-title').value = '';
     setupQuestions = [ makeBlankQuestion() ];
     setupMode = 'sequential';
+    setupReveal = 'hide';
     applySetupHeading();
     renderSetupModePills();
+    renderSetupRevealPills();
     renderSetupQuestionList();
     return;
   }
@@ -2137,10 +2175,12 @@ function renderSetupScreen(editCode){
     }));
     if (setupQuestions.length === 0) setupQuestions = [ makeBlankQuestion() ];
     setupMode = data.mode === 'all' ? 'all' : 'sequential';
+    setupReveal = data.projReveal === 'show' ? 'show' : 'hide';
     showScreen('view-teacher-setup');
     $('setup-title').value = data.title || '';
     applySetupHeading();
     renderSetupModePills();
+    renderSetupRevealPills();
     renderSetupQuestionList();
   });
 }
@@ -2156,6 +2196,19 @@ function renderSetupModePills(){
     wrap.appendChild(p);
   });
   $('setup-mode-desc').textContent = POLL_MODES.find(m => m.key === setupMode).desc;
+}
+
+function renderSetupRevealPills(){
+  const wrap = $('setup-reveal-pills');
+  wrap.innerHTML = '';
+  REVEAL_OPTS.forEach(m => {
+    const p = document.createElement('button');
+    p.className = 'pill' + (setupReveal === m.key ? ' active' : '');
+    p.textContent = m.label;
+    p.addEventListener('click', () => { setupReveal = m.key; renderSetupRevealPills(); });
+    wrap.appendChild(p);
+  });
+  $('setup-reveal-desc').textContent = REVEAL_OPTS.find(m => m.key === setupReveal).desc;
 }
 
 function makeBlankQuestion(){
@@ -2276,7 +2329,7 @@ $('setup-start-btn').addEventListener('click', () => {
     questionsObj['q' + i] = { ...q, order: i };
   });
 
-  createSessionWithUniqueCode(title, questionsObj, setupMode);
+  createSessionWithUniqueCode(title, questionsObj, setupMode, setupReveal);
 });
 
 /* 保存済み投票の編集：
@@ -2353,6 +2406,7 @@ function saveEditedSession(title){
     return Promise.all([
       db.ref('sessions/' + code + '/title').set(title),
       db.ref('sessions/' + code + '/mode').set(setupMode),
+      db.ref('sessions/' + code + '/projReveal').set(setupReveal),
       db.ref('sessions/' + code + '/questions').set(questionsObj),
       db.ref('sessions/' + code + '/activeQuestion').set(activeQuestion),
       ...removeResponseIds.map(id => db.ref('responses/' + code + '/' + id).remove())
@@ -2367,13 +2421,14 @@ function saveEditedSession(title){
   });
 }
 
-function createSessionWithUniqueCode(title, questionsObj, mode){
+function createSessionWithUniqueCode(title, questionsObj, mode, reveal){
   const code = genCode();
   db.ref('sessions/' + code).once('value').then(snap => {
-    if (snap.exists()) { createSessionWithUniqueCode(title, questionsObj, mode); return; }
+    if (snap.exists()) { createSessionWithUniqueCode(title, questionsObj, mode, reveal); return; }
     db.ref('sessions/' + code).set({
       title: title,
       mode: mode,
+      projReveal: reveal === 'show' ? 'show' : 'hide',
       createdAt: firebase.database.ServerValue.TIMESTAMP,
       activeQuestion: 'q0',
       questions: questionsObj
@@ -2471,9 +2526,11 @@ function enterControlScreen(code){
     $('control-mode-label').textContent = data.mode === 'all'
       ? 'モード：まとめて配信（学生は全設問に自由な順で回答できます）'
       : 'モード：一問ずつ出題';
+    $('control-mode-label').textContent += '　／　投影：' + (data.projReveal === 'show' ? 'すぐに結果を表示' : '回答中は結果を隠す');
     renderQList(code, data);
     renderStage(code, data);
     updateProjBar();
+    if (isProj() && controlState.projKind === 'overview') renderProjOverview();
   };
   sessionRef.on('value', cb);
   activeFirebaseRefs.push({ref: sessionRef, cb});
@@ -2515,12 +2572,108 @@ $('stage-prev-btn').addEventListener('click', () => stepQuestion(-1));
 /* ---- 投影モード ---- */
 let projBarTimer = null;
 function isProj(){ return $('view-teacher-control').classList.contains('proj'); }
+/* ---- 投影モードのページ送り ----
+   まとめて配信：0=回答状況の一覧，1〜N=各設問の結果
+   一問ずつ出題：設問ごとに「回答受付（設問と回答数だけ）」→「結果」の2ページ
+   → 回答中に結果が映らないようにする */
+function projQIds(){
+  const sd = controlState.sessionData;
+  if (!sd || !sd.questions) return [];
+  return Object.entries(sd.questions).sort((a,b) => a[1].order - b[1].order).map(e => e[0]);
+}
+function projHides(){
+  const sd = controlState.sessionData || {};
+  return sd.projReveal !== 'show';   /* 未設定の投票は「隠す」扱い */
+}
+function projInfo(page){
+  const sd = controlState.sessionData || {};
+  const ids = projQIds();
+  if (!projHides()) return { kind:'result', qi: Math.max(0, Math.min(ids.length - 1, page)), total: Math.max(1, ids.length) };
+  if (sd.mode === 'all') {
+    if (page <= 0) return { kind:'overview', qi:-1, total: ids.length + 1 };
+    return { kind:'result', qi: page - 1, total: ids.length + 1 };
+  }
+  return { kind: page % 2 === 0 ? 'collect' : 'result', qi: Math.floor(page / 2), total: ids.length * 2 };
+}
+function projShowsChart(){
+  return !isProj() || controlState.projKind === 'result';
+}
 function updateProjBar(){
   const sd = controlState.sessionData;
   if (!sd || !sd.questions) { $('proj-pos').textContent = ''; return; }
-  const ids = Object.entries(sd.questions).sort((a,b) => a[1].order - b[1].order).map(e => e[0]);
-  const idx = ids.indexOf(sd.activeQuestion);
-  $('proj-pos').textContent = (idx + 1) + ' / ' + ids.length;
+  const info = projInfo(controlState.projPage || 0);
+  const n = projQIds().length;
+  let label;
+  if (info.kind === 'overview') label = '回答状況';
+  else if (!projHides()) label = (sd.mode === 'all' ? '結果 ' : '設問') + (info.qi + 1) + '/' + n;
+  else if (sd.mode === 'all') label = '結果 ' + (info.qi + 1) + '/' + n;
+  else label = '設問' + (info.qi + 1) + '/' + n + (info.kind === 'collect' ? ' 回答受付' : ' 結果');
+  $('proj-pos').textContent = label;
+}
+function renderProjOverview(){
+  const sd = controlState.sessionData;
+  const box = $('proj-overview');
+  if (!sd || !sd.questions) { box.innerHTML = ''; return; }
+  const ids = projQIds();
+  const counts = ids.map(id => (controlState.allCounts && controlState.allCounts[id]) || 0);
+  const max = Math.max(1, ...counts);
+  let html = '<div class="po-head"><div class="po-title">' + escapeHtml(sd.title || '') + '</div><div class="po-sub">回答状況（結果は次のページから表示します）</div></div>';
+  ids.forEach((id, i) => {
+    const q = sd.questions[id];
+    html += '<div class="po-row"><span class="po-no">' + (i + 1) + '</span><span class="po-text">' + escapeHtml(q.text) + '</span>' +
+      '<span class="po-tag">' + escapeHtml(typeLabelFor(q)) + '</span>' +
+      '<span class="po-bar"><i style="width:' + Math.round(counts[i] / max * 100) + '%"></i></span>' +
+      '<span class="po-n">' + counts[i] + '件</span></div>';
+  });
+  box.innerHTML = html;
+}
+let projAllRef = null, projAllCb = null;
+function projSubscribeAll(){
+  projUnsubscribeAll();
+  const code = controlState.code;
+  projAllRef = db.ref('responses/' + code);
+  projAllCb = snap => {
+    const c = {};
+    snap.forEach(ch => { c[ch.key] = ch.numChildren(); });
+    controlState.allCounts = c;
+    if (isProj() && controlState.projKind === 'overview') renderProjOverview();
+  };
+  projAllRef.on('value', projAllCb);
+}
+function projUnsubscribeAll(){
+  if (projAllRef) { projAllRef.off('value', projAllCb); projAllRef = null; projAllCb = null; }
+}
+function projApply(page){
+  const v = $('view-teacher-control');
+  const info = projInfo(page);
+  page = Math.max(0, Math.min(info.total - 1, page));
+  const info2 = projInfo(page);
+  controlState.projPage = page;
+  controlState.projKind = info2.kind;
+  v.classList.toggle('proj-overview', info2.kind === 'overview');
+  v.classList.toggle('proj-collect', info2.kind === 'collect');
+  const ids = projQIds();
+  if (info2.kind === 'overview') {
+    renderProjOverview();
+  } else {
+    const qId = ids[info2.qi];
+    const sd = controlState.sessionData;
+    if (qId && sd.activeQuestion !== qId) setActiveQuestion(controlState.code, qId);
+  }
+  updateProjBar();
+  if (info2.kind === 'result') requestAnimationFrame(() => requestAnimationFrame(rerenderStageChart));
+}
+function projStep(d){
+  if (!isProj() || !controlState.sessionData) return;
+  projApply((controlState.projPage || 0) + d);
+}
+function projInit(){
+  const sd = controlState.sessionData;
+  let page = 0;
+  const idx = Math.max(0, projQIds().indexOf(sd && sd.activeQuestion));
+  if (sd && sd.mode !== 'all') page = projHides() ? idx * 2 : idx;
+  if (sd && sd.mode === 'all' && projHides()) projSubscribeAll();
+  projApply(page);
 }
 function showProjBar(ms){
   const bar = $('proj-bar');
@@ -2529,6 +2682,7 @@ function showProjBar(ms){
   projBarTimer = setTimeout(() => bar.classList.remove('show'), ms || 2500);
 }
 function rerenderStageChart(){
+  if (!projShowsChart()) return;
   if (controlState.lastQ && controlState.lastResponses) renderChartForType(controlState.lastQ, controlState.lastResponses);
 }
 function setProjection(on){
@@ -2537,20 +2691,23 @@ function setProjection(on){
   v.classList.toggle('proj', on);
   document.body.style.overflow = on ? 'hidden' : '';
   if (on) {
-    updateProjBar();
+    projInit();
     showProjBar(4000);
     try { const r = document.documentElement.requestFullscreen && document.documentElement.requestFullscreen(); if (r && r.catch) r.catch(()=>{}); } catch(e){}
   } else {
     clearTimeout(projBarTimer);
     $('proj-bar').classList.remove('show');
+    v.classList.remove('proj-overview', 'proj-collect');
+    controlState.projKind = null;
+    projUnsubscribeAll();
     try { if (document.fullscreenElement) { const r = document.exitFullscreen(); if (r && r.catch) r.catch(()=>{}); } } catch(e){}
+    requestAnimationFrame(() => requestAnimationFrame(() => { if (controlState.lastQ && controlState.lastResponses) renderChartForType(controlState.lastQ, controlState.lastResponses); }));
   }
-  requestAnimationFrame(() => requestAnimationFrame(rerenderStageChart));
 }
 $('proj-toggle-btn').addEventListener('click', () => setProjection(true));
 $('proj-exit').addEventListener('click', () => setProjection(false));
-$('proj-prev').addEventListener('click', () => { stepQuestion(-1); showProjBar(); });
-$('proj-next').addEventListener('click', () => { stepQuestion(1); showProjBar(); });
+$('proj-prev').addEventListener('click', () => { projStep(-1); showProjBar(); });
+$('proj-next').addEventListener('click', () => { projStep(1); showProjBar(); });
 document.addEventListener('mousemove', () => { if (isProj()) showProjBar(); });
 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && isProj()) setProjection(false); });
 let projResizeTimer = null;
@@ -2568,8 +2725,8 @@ document.addEventListener('keydown', e => {
   if (k === 'p' || k === 'P') { setProjection(!isProj()); e.preventDefault(); return; }
   if (!isProj()) return;
   if (k === 'Escape') { setProjection(false); e.preventDefault(); }
-  else if (k === 'ArrowRight' || k === 'PageDown' || k === ' ') { stepQuestion(1); showProjBar(); e.preventDefault(); }
-  else if (k === 'ArrowLeft' || k === 'PageUp') { stepQuestion(-1); showProjBar(); e.preventDefault(); }
+  else if (k === 'ArrowRight' || k === 'PageDown' || k === ' ') { projStep(1); showProjBar(); e.preventDefault(); }
+  else if (k === 'ArrowLeft' || k === 'PageUp') { projStep(-1); showProjBar(); e.preventDefault(); }
 });
 $('control-reset-btn').addEventListener('click', () => {
   const { code, sessionData } = controlState;
@@ -2605,7 +2762,8 @@ function renderStage(code, data){
     snap.forEach(child => { responses.push(child.val().value); });
     $('stage-count').textContent = responses.length + '件の回答';
     controlState.lastQ = q; controlState.lastResponses = responses;
-    renderChartForType(q, responses);
+    $('proj-collect-n').textContent = responses.length;
+    if (projShowsChart()) renderChartForType(q, responses);
   };
   stageResponsesRef.on('value', stageResponsesCb);
 }

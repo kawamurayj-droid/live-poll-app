@@ -2611,6 +2611,44 @@ function renderStage(code, data){
 }
 
 function renderChartForType(q, responses){
+  /* 描画で例外が出ても件数表示だけで終わらないよう，原因を画面に出す */
+  const empty = $('stage-empty');
+  empty.style.color = '';
+  try {
+    if (responses.length > 0 && q.type !== 'text' && typeof Chart === 'undefined') throw new Error('Chart.js が読み込まれていません');
+    if (responses.length > 0 && q.type === 'text' && typeof WordCloud === 'undefined') throw new Error('wordcloud2.js が読み込まれていません');
+    renderChartInner(q, responses);
+  } catch (err) {
+    console.error('グラフ描画エラー', err);
+    empty.classList.remove('hidden');
+    empty.style.color = '#D1573E';
+    empty.textContent = 'グラフを描画できませんでした：' + (err && err.message ? err.message : err);
+    return;
+  }
+  if (empty.textContent.indexOf('グラフを描画') === 0) empty.textContent = 'まだ回答がありません';
+}
+
+/* 棒の上に人数を表示する小さなプラグイン（Chart.js 本体にはない機能なので自前で描く） */
+const barCountLabels = {
+  id: 'barCountLabels',
+  afterDatasetsDraw(chart, args, opts){
+    const ctx = chart.ctx;
+    const size = isProj() ? 30 : 16;
+    ctx.save();
+    ctx.font = '700 ' + size + 'px "Zen Kaku Gothic New", sans-serif';
+    ctx.fillStyle = '#20242B';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    chart.getDatasetMeta(0).data.forEach((bar, i) => {
+      const v = chart.data.datasets[0].data[i];
+      if (opts && opts.hideZero && !v) return;
+      ctx.fillText(v + '人', bar.x, bar.y - 6);
+    });
+    ctx.restore();
+  }
+};
+
+function renderChartInner(q, responses){
   const canvas = $('chart-canvas');
   const wcWrap = $('wordcloud-canvas');
   const numStats = $('stage-numeric-stats');
@@ -2631,13 +2669,15 @@ function renderChartForType(q, responses){
     );
     controlState.chart = new Chart(canvas.getContext('2d'), {
       type: 'bar',
+      plugins: [barCountLabels],
       data: {
         labels: q.options,
         datasets: [{ data: counts, backgroundColor: CHART_COLORS }]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
+        layout: { padding: { top: isProj() ? 40 : 24 } },
+        plugins: { legend: { display: false }, barCountLabels: {} },
         scales: {
           x: { ticks: { color: '#20242B', font: { size: isProj() ? 26 : 14 } }, grid: { color: '#E4E0D4' } },
           y: { beginAtZero: true, ticks: { color: '#565F6B', stepSize: 1, font: { size: isProj() ? 22 : 12 } }, grid: { color: '#E4E0D4' } }
@@ -2669,10 +2709,12 @@ function renderChartForType(q, responses){
     const labels = buckets.map((_, i) => (min + i * bucketSize).toFixed(1));
     controlState.chart = new Chart(canvas.getContext('2d'), {
       type: 'bar',
+      plugins: [barCountLabels],
       data: { labels, datasets: [{ data: buckets, backgroundColor: '#2F9C8F' }] },
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
+        layout: { padding: { top: isProj() ? 40 : 24 } },
+        plugins: { legend: { display: false }, barCountLabels: { hideZero: true } },
         scales: {
           x: { ticks: { color: '#20242B', font: { size: isProj() ? 22 : 12 } }, grid: { color: '#E4E0D4' } },
           y: { beginAtZero: true, ticks: { color: '#565F6B', stepSize: 1, font: { size: isProj() ? 22 : 12 } }, grid: { color: '#E4E0D4' } }

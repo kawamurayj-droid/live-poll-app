@@ -269,8 +269,8 @@ a.link{color:var(--sky);}
 <!-- ============================================================ -->
 <div id="view-teacher-setup" class="screen hidden">
   <div class="card card-wide">
-    <h1 style="margin-bottom:4px;">新しい投票を作成</h1>
-    <p class="muted" style="margin-bottom:22px;">各設問の右上の▲▼で順番を入れ替えられます。</p>
+    <h1 style="margin-bottom:4px;" id="setup-heading">新しい投票を作成</h1>
+    <p class="muted" style="margin-bottom:22px;" id="setup-subheading">各設問の右上の▲▼で順番を入れ替えられます。</p>
 
     <div class="field">
       <label>投票のタイトル（講義名など）</label>
@@ -324,6 +324,7 @@ a.link{color:var(--sky);}
       </div>
       <div class="btn-row">
         <button class="btn btn-ghost" id="control-reset-btn">この設問の回答をリセット</button>
+        <a class="btn btn-ghost" id="control-edit-link" href="#teacher-history">この投票を編集</a>
         <a class="btn btn-ghost" href="#teacher-setup">終了する</a>
       </div>
     </div>
@@ -438,7 +439,7 @@ function route(){
     }
   } else if (path === 'teacher-setup') {
     if (!requireTeacherAuth()) return;
-    renderSetupScreen();
+    renderSetupScreen(params.get('edit'));
   } else if (path === 'teacher-history') {
     if (!requireTeacherAuth()) return;
     renderHistoryScreen();
@@ -757,14 +758,60 @@ const POLL_MODES = [
   {key:'all', label:'まとめて配信', desc:'開始と同時に全設問が学生に公開され，各自好きな順番・ペースで回答できます（アンケート形式）。'}
 ];
 
-function renderSetupScreen(){
-  showScreen('view-teacher-setup');
-  $('setup-title').value = '';
+let setupEditCode = null;
+
+function questionSignature(type, options, multiple){
+  return JSON.stringify([
+    type,
+    type === 'choice' ? (options || []).map(o => String(o).trim()).filter(Boolean) : null,
+    type === 'choice' ? !!multiple : null
+  ]);
+}
+
+function applySetupHeading(){
+  const editing = !!setupEditCode;
+  $('setup-heading').textContent = editing ? '投票を編集' : '新しい投票を作成';
+  $('setup-subheading').textContent = editing
+    ? '参加コード ' + setupEditCode + ' はそのままです。設問文だけの修正は回答を残したまま反映され，種類や選択肢を変えた設問は，その設問の回答だけ削除されます。'
+    : '各設問の右上の▲▼で順番を入れ替えられます。';
+  $('setup-start-btn').textContent = editing ? '変更を保存する' : '投票を開始する';
+}
+
+function renderSetupScreen(editCode){
+  setupEditCode = editCode || null;
   $('setup-error').textContent = '';
-  setupQuestions = [ makeBlankQuestion() ];
-  setupMode = 'sequential';
-  renderSetupModePills();
-  renderSetupQuestionList();
+
+  if (!setupEditCode) {
+    showScreen('view-teacher-setup');
+    $('setup-title').value = '';
+    setupQuestions = [ makeBlankQuestion() ];
+    setupMode = 'sequential';
+    applySetupHeading();
+    renderSetupModePills();
+    renderSetupQuestionList();
+    return;
+  }
+
+  db.ref('sessions/' + setupEditCode).once('value').then(snap => {
+    const data = snap.val();
+    if (!data) { location.hash = 'teacher-history'; return; }
+    const entries = Object.entries(data.questions || {}).sort((a, b) => a[1].order - b[1].order);
+    setupQuestions = entries.map(([qId, q]) => ({
+      _id: qId,
+      _sig: questionSignature(q.type, q.options, q.multiple),
+      type: q.type,
+      text: q.text || '',
+      options: q.type === 'choice' ? (q.options || []).slice() : ['', ''],
+      multiple: !!q.multiple
+    }));
+    if (setupQuestions.length === 0) setupQuestions = [ makeBlankQuestion() ];
+    setupMode = data.mode === 'all' ? 'all' : 'sequential';
+    showScreen('view-teacher-setup');
+    $('setup-title').value = data.title || '';
+    applySetupHeading();
+    renderSetupModePills();
+    renderSetupQuestionList();
+  });
 }
 
 function renderSetupModePills(){
@@ -888,6 +935,11 @@ $('setup-start-btn').addEventListener('click', () => {
     return;
   }
 
+  if (setupEditCode) {
+    saveEditedSession(title);
+    return;
+  }
+
   const questionsObj = {};
   cleaned.forEach((q, i) => {
     questionsObj['q' + i] = { ...q, order: i };
@@ -895,6 +947,94 @@ $('setup-start-btn').addEventListener('click', () => {
 
   createSessionWithUniqueCode(title, questionsObj, setupMode);
 });
+
+/* 保存済み投票の編集：
+   ・設問文だけの修正 → 同じ設問IDのまま回答を残す
+   ・種類／選択肢／複数選択を変更 → 新しい設問IDにして，その設問の旧回答を削除
+   ・削除した設問 → 旧回答も削除
+   新しい設問IDにするのは，学生端末の「回答済み」記録と食い違わないようにするため */
+function saveEditedSession(title){
+  const code = setupEditCode;
+  const btn = $('setup-start-btn');
+
+  const valid = setupQuestions.filter(q => q.text.trim() && (q.type !== 'choice' || (q.options || []).map(o => o.trim()).filter(Boolean).length >= 2));
+
+  Promise.all([
+    db.ref('sessions/' + code).once('value'),
+    db.ref('responses/' + code).once('value')
+  ]).then(([sessSnap, respSnap]) => {
+    const current = sessSnap.val();
+    if (!current) { location.hash = 'teacher-history'; return; }
+    const oldQuestions = current.questions || {};
+    const respData = respSnap.val() || {};
+    const countOf = qId => respData[qId] ? Object.keys(respData[qId]).length : 0;
+
+    const questionsObj = {};
+    const removeResponseIds = [];
+    const lostSummary = [];
+    const keptIds = new Set();
+    const newIdFor = {};
+    const stamp = Date.now().toString(36);
+
+    valid.forEach((q, i) => {
+      const cleanOptions = q.type === 'choice' ? (q.options || []).map(o => o.trim()).filter(Boolean) : null;
+      const sigNow = questionSignature(q.type, cleanOptions, q.multiple);
+      let qId;
+      if (q._id && oldQuestions[q._id] && q._sig === sigNow) {
+        qId = q._id;
+        keptIds.add(qId);
+      } else {
+        qId = 'q' + stamp + i;
+        if (q._id && oldQuestions[q._id]) {
+          keptIds.add(q._id);
+          removeResponseIds.push(q._id);
+          if (countOf(q._id) > 0) lostSummary.push(`設問${i + 1}（種類・選択肢の変更）: ${countOf(q._id)}件`);
+        }
+      }
+      if (q._id) newIdFor[q._id] = qId;
+      questionsObj[qId] = {
+        type: q.type,
+        text: q.text.trim(),
+        options: cleanOptions,
+        multiple: q.type === 'choice' ? !!q.multiple : null,
+        order: i
+      };
+    });
+
+    Object.keys(oldQuestions).forEach(oldId => {
+      if (!keptIds.has(oldId)) {
+        removeResponseIds.push(oldId);
+        if (countOf(oldId) > 0) lostSummary.push(`削除した設問「${(oldQuestions[oldId].text || '').slice(0, 20)}」: ${countOf(oldId)}件`);
+      }
+    });
+
+    if (lostSummary.length > 0) {
+      const ok = confirm('次の回答データが削除され，元に戻せません。\n\n' + lostSummary.join('\n') + '\n\n変更を保存しますか？');
+      if (!ok) return;
+    }
+
+    const orderedIds = Object.keys(questionsObj).sort((a, b) => questionsObj[a].order - questionsObj[b].order);
+    const activeQuestion = (newIdFor[current.activeQuestion] && questionsObj[newIdFor[current.activeQuestion]])
+      ? newIdFor[current.activeQuestion]
+      : orderedIds[0];
+
+    btn.disabled = true;
+    return Promise.all([
+      db.ref('sessions/' + code + '/title').set(title),
+      db.ref('sessions/' + code + '/mode').set(setupMode),
+      db.ref('sessions/' + code + '/questions').set(questionsObj),
+      db.ref('sessions/' + code + '/activeQuestion').set(activeQuestion),
+      ...removeResponseIds.map(id => db.ref('responses/' + code + '/' + id).remove())
+    ]).then(() => {
+      btn.disabled = false;
+      location.hash = 'teacher-control?code=' + code;
+    });
+  }).catch(err => {
+    btn.disabled = false;
+    $('setup-error').textContent = '保存できませんでした。通信状況を確認してもう一度お試しください。';
+    console.error(err);
+  });
+}
 
 function createSessionWithUniqueCode(title, questionsObj, mode){
   const code = genCode();
@@ -931,15 +1071,23 @@ function renderHistoryScreen(){
     items.forEach(item => {
       const row = document.createElement('div');
       row.className = 'qcard';
-      row.style.cssText = 'position:relative; cursor:pointer; padding-right:120px;';
+      row.style.cssText = 'position:relative; cursor:pointer; padding-right:190px;';
       const date = item.createdAt ? new Date(item.createdAt).toLocaleString('ja-JP') : '';
       row.innerHTML = `<strong>${escapeHtml(item.title || '無題')}</strong>
         <div class="muted" style="margin-top:4px;">コード: ${item.code} ／ ${date}</div>
-        <button class="btn-danger history-delete" data-code="${item.code}"
-          style="position:absolute; top:14px; right:14px; padding:7px 14px; font-size:13px; border:none; border-radius:10px;">削除</button>`;
+        <div style="position:absolute; top:14px; right:14px; display:flex; gap:8px;">
+          <button class="history-edit" data-code="${item.code}"
+            style="padding:7px 14px; font-size:13px; border:1px solid var(--line); border-radius:10px; background:var(--bg-panel); color:var(--ink);">編集</button>
+          <button class="btn-danger history-delete" data-code="${item.code}"
+            style="padding:7px 14px; font-size:13px; border:none; border-radius:10px;">削除</button>
+        </div>`;
       row.addEventListener('click', (e) => {
-        if (e.target.closest('.history-delete')) return;
+        if (e.target.closest('.history-delete') || e.target.closest('.history-edit')) return;
         location.hash = 'teacher-control?code=' + item.code;
+      });
+      row.querySelector('.history-edit').addEventListener('click', (e) => {
+        e.stopPropagation();
+        location.hash = 'teacher-setup?edit=' + item.code;
       });
       row.querySelector('.history-delete').addEventListener('click', (e) => {
         e.stopPropagation();
@@ -965,6 +1113,7 @@ function enterControlScreen(code){
   controlState.code = code;
   showScreen('view-teacher-control');
   $('control-code').textContent = code;
+  $('control-edit-link').href = '#teacher-setup?edit=' + code;
 
   const sessionRef = db.ref('sessions/' + code);
   const cb = snap => {

@@ -1526,6 +1526,57 @@ a.link{color:var(--sky);}
 .top-title .kicker{color:var(--ink-dim); font-size:14px; letter-spacing:1px; margin-bottom:6px;}
 .top-title h1{font-size:26px;}
 .footer-link{margin-top:20px; text-align:center;}
+
+/* ---- 質問受付（Q&A）：学生画面 ---- */
+.qa-compose textarea{min-height:90px;}
+.qa-compose-foot{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:10px; flex-wrap:wrap;}
+.qa-sent{font-size:14px; color:var(--teal); font-weight:700; margin:10px 0 0; min-height:1em;}
+.qa-list-head{font-size:14px; color:var(--ink-dim); margin:22px 0 10px; padding-top:16px; border-top:1px solid var(--line);}
+.qa-sitem{background:var(--bg-panel2); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:8px;}
+.qa-sitem .t{font-size:15px; line-height:1.6; white-space:pre-wrap; word-break:break-word;}
+.qa-sitem .f{display:flex; align-items:center; gap:8px; margin-top:8px; flex-wrap:wrap;}
+.qa-badge{font-size:12px; border-radius:20px; padding:2px 10px; background:var(--bg-panel); border:1px solid var(--line); color:var(--ink-dim);}
+.qa-badge.done{background:#E3F2EF; border-color:var(--teal); color:#1F6E65;}
+.qa-badge.mine{background:var(--gold-dim); border-color:var(--gold); color:var(--gold-text);}
+.qa-like{margin-left:auto; border:1px solid var(--line); background:var(--bg-panel); color:var(--ink); border-radius:20px; padding:6px 14px; font-size:14px;}
+.qa-like.on{background:var(--gold); border-color:var(--gold); color:#1B2129; font-weight:700;}
+.qa-like:disabled{opacity:.5; cursor:default;}
+
+/* ---- 質問受付（Q&A）：教員画面 ---- */
+#qa-board{display:flex; flex-direction:column; gap:8px;}
+.qa-toolbar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:6px;}
+.qa-toolbar .type-pills{margin:0;}
+.qa-toolbar .sum{font-size:13px; color:var(--ink-dim); margin-left:auto;}
+.qa-toolbar .btn{padding:7px 14px; font-size:13px;}
+.qa-item{display:flex; gap:14px; align-items:flex-start; background:var(--bg-panel); border:1px solid var(--line); border-radius:12px; padding:12px 14px;}
+.qa-item.featured{border:2px solid var(--gold); background:#FFF8EA;}
+.qa-item.answered{opacity:.6;}
+.qa-item.hidden-q{opacity:.4; background:var(--bg-panel2);}
+.qa-item.hidden-q .qa-text{text-decoration:line-through;}
+.qa-likes{min-width:52px; text-align:center; font-size:13px; color:var(--ink-dim);}
+.qa-likes b{display:block; font-family:var(--font-head); font-size:24px; color:var(--gold-text); line-height:1.1;}
+.qa-body{flex:1; min-width:0;}
+.qa-text{font-size:16px; line-height:1.6; white-space:pre-wrap; word-break:break-word;}
+.qa-meta{font-size:12px; color:var(--ink-dim); margin-top:4px;}
+.qa-actions{display:flex; flex-direction:column; gap:6px;}
+.qa-actions button{font-size:12px; padding:5px 10px; border-radius:8px; border:1px solid var(--line); background:var(--bg-panel); color:var(--ink); white-space:nowrap;}
+.qa-actions button.on{background:var(--gold); border-color:var(--gold); font-weight:700;}
+.qa-empty{color:var(--ink-dim); text-align:center; padding:40px 0;}
+/* 投影：操作ボタンを隠し，スポットライトと上位の質問を大きく映す */
+#view-teacher-control.proj #qa-board{height:100%; overflow:hidden; gap:clamp(8px,1vw,14px);}
+#view-teacher-control.proj .qa-toolbar,
+#view-teacher-control.proj .qa-actions,
+#view-teacher-control.proj .qa-meta{display:none !important;}
+#view-teacher-control.proj .qa-item{padding:clamp(12px,1.4vw,22px) clamp(16px,1.8vw,28px); align-items:center;}
+#view-teacher-control.proj .qa-text{font-size:clamp(22px,2.4vw,38px); line-height:1.4;}
+#view-teacher-control.proj .qa-likes{font-size:clamp(14px,1.3vw,20px); min-width:clamp(70px,6vw,110px);}
+#view-teacher-control.proj .qa-likes b{font-size:clamp(30px,3vw,52px);}
+#view-teacher-control.proj .qa-item.featured .qa-text{font-size:clamp(30px,3.6vw,58px);}
+#view-teacher-control.proj .qa-empty{font-size:clamp(22px,2.4vw,36px);}
+.qa-spot-label{font-size:13px; font-weight:700; color:var(--gold-text); margin-bottom:2px;}
+#view-teacher-control.proj .qa-spot-label{font-size:clamp(16px,1.5vw,24px);}
+.qa-more{font-size:13px; color:var(--ink-dim); text-align:right;}
+#view-teacher-control.proj .qa-more{font-size:clamp(16px,1.5vw,24px);}
 </style>
 </head>
 <body>
@@ -1575,6 +1626,8 @@ a.link{color:var(--sky);}
         <input type="number" id="student-numeric-input" placeholder="数値を入力">
         <button class="btn btn-block" style="margin-top:12px;" id="student-numeric-submit">送信する</button>
       </div>
+
+      <div id="student-qa-area" class="hidden"></div>
     </div>
 
     <div id="student-done" class="hidden" style="text-align:center;">
@@ -1698,12 +1751,13 @@ a.link{color:var(--sky);}
         </div>
         <h2 id="stage-qtext"></h2>
         <p id="stage-note" class="hidden"></p>
-        <div id="proj-collect"><div class="pc-n" id="proj-collect-n">0</div><div class="pc-l">件の回答</div><div class="pc-hint">スマートフォンから回答してください（結果は次のページで表示します）</div></div>
+        <div id="proj-collect"><div class="pc-n" id="proj-collect-n">0</div><div class="pc-l" id="proj-collect-l">件の回答</div><div class="pc-hint" id="proj-collect-hint">スマートフォンから回答してください（結果は次のページで表示します）</div></div>
         <div id="proj-overview"></div>
         <div id="stage-numeric-stats" class="numeric-stats hidden"></div>
         <div class="chart-area">
           <canvas id="chart-canvas" class="hidden"></canvas>
           <div id="wordcloud-canvas" class="hidden" style="position:relative;"><canvas id="wc-inner-canvas"></canvas></div>
+          <div id="qa-board" class="hidden"></div>
           <div id="stage-empty" class="empty-state">まだ回答がありません</div>
         </div>
         <div class="btn-row stage-nav" style="margin-top:16px;">
@@ -1759,8 +1813,42 @@ function genCode(){
 const QUESTION_TYPES = [
   {key:'choice', label:'選択式'},
   {key:'text', label:'自由記述（ワードクラウド）'},
-  {key:'numeric', label:'数値回答'}
+  {key:'numeric', label:'数値回答'},
+  {key:'qa', label:'質問受付（Q&A）'}
 ];
+/* 端末ID：いいねの重複防止に使う（匿名のまま，同じ端末からの二重いいねを防ぐ） */
+function deviceId(){
+  let id = null;
+  try { id = localStorage.getItem('lp_device'); } catch(e){}
+  if (!id) {
+    id = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    try { localStorage.setItem('lp_device', id); } catch(e){}
+  }
+  return id;
+}
+/* Q&Aの1件をそろえた形にする */
+function normalizeQA(id, v){
+  v = v || {};
+  return {
+    id: id,
+    text: String(v.value == null ? '' : v.value),
+    likes: v.likes ? Object.keys(v.likes).length : 0,
+    likedByMe: !!(v.likes && v.likes[deviceId()]),
+    answered: !!v.answered,
+    hidden: !!v.hidden,
+    ts: v.ts || 0
+  };
+}
+function sortQA(items, mode){
+  return items.slice().sort((a, b) =>
+    mode === 'new' ? (b.ts - a.ts) : ((b.likes - a.likes) || (b.ts - a.ts))
+  );
+}
+function fmtTime(ts){
+  if (!ts) return '';
+  const d = new Date(ts);
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
 const CHART_COLORS = ['#C98A2A','#2F9C8F','#D1573E','#7C63B0','#5F8F44','#3E7FBF'];
 function typeLabelFor(q){
   const base = QUESTION_TYPES.find(t => t.key === q.type)?.label || '';
@@ -1833,6 +1921,7 @@ function teardownListeners(){
   if (typeof setProjection === 'function') setProjection(false);
   activeFirebaseRefs.forEach(({ref, cb}) => ref.off('value', cb));
   activeFirebaseRefs = [];
+  unmountStudentQA();
   if (controlState.chart) { controlState.chart.destroy(); controlState.chart = null; }
 }
 
@@ -1877,6 +1966,8 @@ function renderStudentQuestion(code, data){
   const allView = $('student-allmode'), allDone = $('student-allmode-done');
   wait.classList.add('hidden'); qView.classList.add('hidden'); done.classList.add('hidden');
   allView.classList.add('hidden'); allDone.classList.add('hidden');
+  const curQ = data.questions && data.activeQuestion ? data.questions[data.activeQuestion] : null;
+  unmountStudentQA(data.mode !== 'all' && curQ && curQ.type === 'qa' ? data.activeQuestion : null);
 
   if (data.mode === 'all') {
     renderStudentAllMode(code, data);
@@ -1890,13 +1981,15 @@ function renderStudentQuestion(code, data){
     return;
   }
 
+  const q = data.questions[qId];
+
+  /* 質問受付は何件でも送れるので「回答済み」で閉じない */
   const answeredKey = 'answered_' + code + '_' + qId;
-  if (localStorage.getItem(answeredKey)) {
+  if (q.type !== 'qa' && localStorage.getItem(answeredKey)) {
     done.classList.remove('hidden');
     return;
   }
 
-  const q = data.questions[qId];
   studentState.currentQId = qId;
   qView.classList.remove('hidden');
 
@@ -1909,10 +2002,15 @@ function renderStudentQuestion(code, data){
   const choiceArea = $('student-choice-area');
   const textArea = $('student-text-area');
   const numArea = $('student-numeric-area');
+  const qaArea = $('student-qa-area');
   choiceArea.classList.add('hidden'); textArea.classList.add('hidden'); numArea.classList.add('hidden');
+  qaArea.classList.add('hidden');
   choiceArea.innerHTML = '';
 
-  if (q.type === 'choice') {
+  if (q.type === 'qa') {
+    qaArea.classList.remove('hidden');
+    mountStudentQA(qaArea, code, qId, q);
+  } else if (q.type === 'choice') {
     choiceArea.classList.remove('hidden');
     if (q.multiple) {
       const selected = new Set();
@@ -1965,8 +2063,10 @@ function renderStudentAllMode(code, data){
   const allDone = $('student-allmode-done');
   const qEntries = Object.entries(data.questions || {}).sort((a,b) => a[1].order - b[1].order);
 
-  const allAnswered = qEntries.every(([qId]) => localStorage.getItem('answered_' + code + '_' + qId));
-  if (allAnswered && qEntries.length > 0) {
+  /* 質問受付は何件でも送れるので，「すべて回答済み」の判定から外し，あれば完了画面にしない */
+  const hasQA = qEntries.some(([, q]) => q.type === 'qa');
+  const allAnswered = qEntries.filter(([, q]) => q.type !== 'qa').every(([qId]) => localStorage.getItem('answered_' + code + '_' + qId));
+  if (allAnswered && qEntries.length > 0 && !hasQA) {
     allDone.classList.remove('hidden');
     return;
   }
@@ -1998,6 +2098,14 @@ function renderStudentAllMode(code, data){
       nt.style.cssText = 'font-size:13px; margin:-8px 0 14px;';
       nt.textContent = q.note;
       card.appendChild(nt);
+    }
+
+    if (q.type === 'qa') {
+      const box = document.createElement('div');
+      card.appendChild(box);
+      allView.appendChild(card);
+      mountStudentQA(box, code, qId, q);
+      return;
     }
 
     if (isAnswered) {
@@ -2080,6 +2188,116 @@ function renderStudentAllMode(code, data){
 
     allView.appendChild(card);
   });
+}
+
+/* =========================================================================
+   学生：質問受付（Q&A）
+   ・匿名で何件でも送れる
+   ・他の学生の質問に「私も聞きたい」（いいね）ができる（設定で非表示にもできる）
+   ・教員が非表示にした質問は学生画面から消える
+   ========================================================================= */
+let studentQASubs = {};      /* qId → {ref, cb} */
+let qaDrafts = {};           /* 画面の再描画で書きかけの質問が消えないよう保持 */
+/* exceptId を指定すると，その設問の質問欄だけは生かしたままにする（一問ずつ出題で同じ設問が続く場合） */
+function unmountStudentQA(exceptId){
+  Object.keys(studentQASubs).forEach(id => {
+    if (id === exceptId) return;
+    const sub = studentQASubs[id];
+    sub.ref.off('value', sub.cb);
+    if (sub.container) { delete sub.container.dataset.qaKey; if (sub.container.id === 'student-qa-area') sub.container.innerHTML = ''; }
+    delete studentQASubs[id];
+  });
+}
+function myQAKey(code){ return 'lp_myqa_' + code; }
+function getMyQA(code){
+  try { return JSON.parse(localStorage.getItem(myQAKey(code)) || '[]'); } catch(e){ return []; }
+}
+function addMyQA(code, pid){
+  const list = getMyQA(code); list.push(pid);
+  try { localStorage.setItem(myQAKey(code), JSON.stringify(list)); } catch(e){}
+}
+
+function mountStudentQA(container, code, qId, q){
+  const showList = q.qaShowList !== false;
+  const mountKey = code + '|' + qId + '|' + showList;
+  /* 同じ設問がすでに表示中なら作り直さない（スポットライト切替などで「送信しました」表示が消えないように） */
+  if (studentQASubs[qId] && studentQASubs[qId].container === container && container.dataset.qaKey === mountKey) return;
+  if (studentQASubs[qId]) { studentQASubs[qId].ref.off('value', studentQASubs[qId].cb); delete studentQASubs[qId]; }
+  container.dataset.qaKey = mountKey;
+  container.innerHTML = `
+    <div class="qa-compose">
+      <textarea data-role="qa-input" maxlength="200" placeholder="講師への質問を入力（短くてOK）"></textarea>
+      <div class="qa-compose-foot">
+        <span class="muted">匿名で送信されます（200字まで）</span>
+        <button class="btn" data-role="qa-send">質問を送る</button>
+      </div>
+      <p class="qa-sent" data-role="qa-sent"></p>
+    </div>
+    <div class="${showList ? '' : 'hidden'}">
+      <div class="qa-list-head" data-role="qa-head">みんなの質問</div>
+      <div data-role="qa-list"></div>
+    </div>`;
+  const ta = container.querySelector('[data-role="qa-input"]');
+  const sendBtn = container.querySelector('[data-role="qa-send"]');
+  const sent = container.querySelector('[data-role="qa-sent"]');
+  const listEl = container.querySelector('[data-role="qa-list"]');
+  const headEl = container.querySelector('[data-role="qa-head"]');
+  const ref = db.ref('responses/' + code + '/' + qId);
+
+  ta.value = qaDrafts[qId] || '';
+  ta.addEventListener('input', () => { qaDrafts[qId] = ta.value; });
+  sendBtn.addEventListener('click', () => {
+    const val = ta.value.trim();
+    if (!val) return;
+    sendBtn.disabled = true;
+    const newRef = ref.push();
+    newRef.set({ value: val.slice(0, 200), ts: firebase.database.ServerValue.TIMESTAMP }).then(() => {
+      addMyQA(code, newRef.key);
+      qaDrafts[qId] = ''; ta.value = '';
+      sent.style.color = '';
+      sent.textContent = '✓ 質問を送信しました。続けて送ることもできます。';
+      sendBtn.disabled = false;
+    }).catch(err => {
+      console.error(err);
+      sent.style.color = 'var(--coral)';
+      sent.textContent = '送信できませんでした。通信状況を確認してもう一度お試しください。';
+      sendBtn.disabled = false;
+    });
+  });
+
+  const cb = snap => {
+    if (!showList) return;
+    const mine = new Set(getMyQA(code));
+    const items = [];
+    snap.forEach(ch => { const it = normalizeQA(ch.key, ch.val()); if (!it.hidden && it.text) items.push(it); });
+    headEl.textContent = items.length
+      ? `みんなの質問（${items.length}件）　自分も聞きたい質問に👍を押してください`
+      : 'みんなの質問';
+    listEl.innerHTML = '';
+    if (items.length === 0) {
+      listEl.innerHTML = '<p class="muted" style="text-align:center;">まだ質問はありません。最初の1件を送ってみましょう。</p>';
+      return;
+    }
+    sortQA(items, 'likes').forEach(it => {
+      const isMine = mine.has(it.id);
+      const row = document.createElement('div');
+      row.className = 'qa-sitem';
+      row.innerHTML = `<div class="t"></div><div class="f">
+        ${it.answered ? '<span class="qa-badge done">回答済み</span>' : ''}
+        ${isMine ? '<span class="qa-badge mine">あなたの質問</span>' : ''}
+        <button class="qa-like${it.likedByMe ? ' on' : ''}" ${isMine ? 'disabled title="自分の質問にはいいねできません"' : ''}>👍 ${isMine ? '' : '私も聞きたい '}${it.likes}</button></div>`;
+      row.querySelector('.t').textContent = it.text;
+      const likeBtn = row.querySelector('.qa-like');
+      if (!isMine) likeBtn.addEventListener('click', () => {
+        likeBtn.disabled = true;
+        const likeRef = ref.child(it.id + '/likes/' + deviceId());
+        (it.likedByMe ? likeRef.remove() : likeRef.set(true)).catch(err => console.error(err));
+      });
+      listEl.appendChild(row);
+    });
+  };
+  ref.on('value', cb);
+  studentQASubs[qId] = { ref, cb, container };
 }
 
 function submitAllModeAnswer(code, qId, value){
@@ -2190,6 +2408,8 @@ function renderSetupScreen(editCode){
       text: q.text || '',
       options: q.type === 'choice' ? (q.options || []).slice() : ['', ''],
       multiple: !!q.multiple,
+      qaShowList: q.qaShowList !== false,
+      featured: q.featured || null,
       note: q.note || ''
     }));
     if (setupQuestions.length === 0) setupQuestions = [ makeBlankQuestion() ];
@@ -2319,6 +2539,18 @@ function renderSetupQuestionList(){
       bodyWrap.innerHTML = '<p class="muted">学生には一言・短いフレーズでの回答を促してください。同じ回答が多いほど大きく表示されます。</p>';
     } else if (q.type === 'numeric') {
       bodyWrap.innerHTML = '<p class="muted">平均値と分布のヒストグラムが表示されます。</p>';
+    } else if (q.type === 'qa') {
+      bodyWrap.innerHTML = '<p class="muted" style="margin:0 0 8px;">学生は匿名で何件でも質問を送れます。教員画面では，いいね順・新着順の並べ替え，「スポットライト」（投影で大きく表示），回答済み・非表示の切り替え，CSV出力ができます。</p>';
+      const lbl = document.createElement('label');
+      lbl.style.cssText = 'display:flex; align-items:center; gap:8px; font-size:14px; color:var(--ink-dim);';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.style.cssText = 'width:auto;';
+      cb.checked = q.qaShowList !== false;
+      cb.addEventListener('change', e => { q.qaShowList = e.target.checked; });
+      lbl.appendChild(cb);
+      lbl.appendChild(document.createTextNode('学生の画面に他の学生の質問を表示し，「私も聞きたい」（いいね）を押せるようにする'));
+      bodyWrap.appendChild(lbl);
     }
   });
 }
@@ -2336,6 +2568,7 @@ $('setup-start-btn').addEventListener('click', () => {
       text: q.text.trim(),
       options: q.type === 'choice' ? (q.options || []).map(o => o.trim()).filter(Boolean) : null,
       multiple: q.type === 'choice' ? !!q.multiple : null,
+      qaShowList: q.type === 'qa' ? q.qaShowList !== false : null,
       note: (q.note || '').trim() || null
     }))
     .filter(q => q.text && (q.type !== 'choice' || q.options.length >= 2));
@@ -2407,6 +2640,8 @@ function saveEditedSession(title){
         text: q.text.trim(),
         options: cleanOptions,
         multiple: q.type === 'choice' ? !!q.multiple : null,
+        qaShowList: q.type === 'qa' ? q.qaShowList !== false : null,
+        featured: (q.type === 'qa' && qId === q._id) ? (q.featured || null) : null,
         note: (q.note || '').trim() || null,
         order: i
       };
@@ -2799,13 +3034,20 @@ function renderStage(code, data){
   $('stage-prev-btn').textContent = data.mode === 'all' ? '← 前の結果を見る' : '← 前の設問';
   $('stage-next-btn').textContent = data.mode === 'all' ? '次の結果を見る →' : '次の設問 →';
 
+  const isQA = q.type === 'qa';
+  $('proj-collect-l').textContent = isQA ? '件の質問' : '件の回答';
+  $('proj-collect-hint').textContent = isQA
+    ? 'スマートフォンから質問を送ってください（匿名・何件でもOK）'
+    : 'スマートフォンから回答してください（結果は次のページで表示します）';
+
   stageResponsesRef = db.ref('responses/' + code + '/' + qId);
   stageResponsesCb = snap => {
     const responses = [];
+    const raw = [];
     /* forEach は true（truthy）を返すと列挙を打ち切るため，波括弧で戻り値を返さない */
-    snap.forEach(child => { responses.push(child.val().value); });
-    $('stage-count').textContent = responses.length + '件の回答';
-    controlState.lastQ = q; controlState.lastResponses = responses;
+    snap.forEach(child => { responses.push(child.val().value); raw.push(normalizeQA(child.key, child.val())); });
+    $('stage-count').textContent = responses.length + (isQA ? '件の質問' : '件の回答');
+    controlState.lastQ = q; controlState.lastResponses = responses; controlState.lastRaw = raw;
     $('proj-collect-n').textContent = responses.length;
     if (projShowsChart()) renderChartForType(q, responses);
   };
@@ -2817,6 +3059,7 @@ function renderChartForType(q, responses){
   const empty = $('stage-empty');
   empty.style.color = '';
   try {
+    if (q.type === 'qa') { renderChartInner(q, responses); return; }
     if (responses.length > 0 && q.type !== 'text' && typeof Chart === 'undefined') throw new Error('Chart.js が読み込まれていません');
     if (responses.length > 0 && q.type === 'text' && typeof WordCloud === 'undefined') throw new Error('wordcloud2.js が読み込まれていません');
     renderChartInner(q, responses);
@@ -2828,6 +3071,137 @@ function renderChartForType(q, responses){
     return;
   }
   if (empty.textContent.indexOf('グラフを描画') === 0) empty.textContent = 'まだ回答がありません';
+}
+
+/* =========================================================================
+   教員：質問受付（Q&A）ボード
+   通常画面：並べ替え・スポットライト・回答済み・非表示・CSV
+   投影画面：スポットライト中の質問を大きく，続けて未回答の上位を表示
+   ========================================================================= */
+controlState.qaSort = 'likes';
+function qaBucket(it){ return it.hidden ? 2 : (it.answered ? 1 : 0); }
+
+function renderQABoard(q, raw){
+  const board = $('qa-board');
+  board.classList.remove('hidden');
+  const items = raw.filter(it => it.text);
+  const featuredId = q.featured || null;
+  board.innerHTML = '';
+
+  if (isProj()) {
+    const visible = items.filter(it => !it.hidden);
+    const spot = visible.find(it => it.id === featuredId) || null;
+    const rest = sortQA(visible.filter(it => !it.answered && (!spot || it.id !== spot.id)), 'likes');
+    const answeredN = visible.filter(it => it.answered).length;
+    if (!spot && rest.length === 0) {
+      board.innerHTML = '<div class="qa-empty">' + (answeredN ? 'すべての質問に回答しました' : 'まだ質問がありません') + '</div>';
+      return;
+    }
+    if (spot) board.appendChild(qaRow(spot, true));
+    const limit = spot ? 3 : 5;
+    rest.slice(0, limit).forEach(it => board.appendChild(qaRow(it, false)));
+    const more = rest.length - limit;
+    if (more > 0 || answeredN > 0) {
+      const m = document.createElement('div');
+      m.className = 'qa-more';
+      m.textContent = [more > 0 ? `ほか ${more}件` : '', answeredN > 0 ? `回答済み ${answeredN}件` : ''].filter(Boolean).join('　／　');
+      board.appendChild(m);
+    }
+    return;
+  }
+
+  /* 通常（操作）画面 */
+  const nHidden = items.filter(it => it.hidden).length;
+  const nAnswered = items.filter(it => it.answered && !it.hidden).length;
+  const bar = document.createElement('div');
+  bar.className = 'qa-toolbar';
+  bar.innerHTML = `<div class="type-pills">
+      <button class="pill${controlState.qaSort === 'likes' ? ' active' : ''}" data-act="sort" data-v="likes">いいね順</button>
+      <button class="pill${controlState.qaSort === 'new' ? ' active' : ''}" data-act="sort" data-v="new">新着順</button>
+    </div>
+    <button class="btn btn-ghost" data-act="csv">CSV出力</button>
+    <span class="sum">未回答 ${items.length - nHidden - nAnswered}　回答済み ${nAnswered}　非表示 ${nHidden}</span>`;
+  board.appendChild(bar);
+
+  if (items.length === 0) {
+    const e = document.createElement('div');
+    e.className = 'qa-empty';
+    e.textContent = 'まだ質問がありません';
+    board.appendChild(e);
+    return;
+  }
+  sortQA(items, controlState.qaSort)
+    .sort((a, b) => qaBucket(a) - qaBucket(b))   /* 未回答 → 回答済み → 非表示 の順にまとめる（各グループ内は選んだ並び順） */
+    .forEach(it => board.appendChild(qaRow(it, it.id === featuredId)));
+}
+
+function qaRow(it, featured){
+  const row = document.createElement('div');
+  row.className = 'qa-item' + (featured ? ' featured' : '') + (it.answered ? ' answered' : '') + (it.hidden ? ' hidden-q' : '');
+  row.innerHTML = `<div class="qa-likes"><b>${it.likes}</b>👍</div>
+    <div class="qa-body">
+      ${featured ? '<div class="qa-spot-label">★ スポットライト</div>' : ''}
+      <div class="qa-text"></div>
+      <div class="qa-meta">${fmtTime(it.ts)}${it.answered ? '　回答済み' : ''}${it.hidden ? '　非表示（学生・投影に出ません）' : ''}</div>
+    </div>
+    <div class="qa-actions">
+      <button data-act="feature" data-id="${it.id}" class="${featured ? 'on' : ''}" ${it.hidden ? 'disabled' : ''}>${featured ? '★ 表示中' : '☆ スポットライト'}</button>
+      <button data-act="answered" data-id="${it.id}" class="${it.answered ? 'on' : ''}">${it.answered ? '✓ 回答済み' : '回答済みにする'}</button>
+      <button data-act="hide" data-id="${it.id}">${it.hidden ? '再表示する' : '非表示'}</button>
+    </div>`;
+  row.querySelector('.qa-text').textContent = it.text;
+  return row;
+}
+
+$('qa-board').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-act]');
+  if (!btn || isProj()) return;
+  const { code, sessionData } = controlState;
+  if (!sessionData) return;
+  const qId = sessionData.activeQuestion;
+  const q = sessionData.questions && sessionData.questions[qId];
+  if (!q || q.type !== 'qa') return;
+  const act = btn.dataset.act, id = btn.dataset.id;
+  const item = (controlState.lastRaw || []).find(it => it.id === id);
+  const featRef = db.ref('sessions/' + code + '/questions/' + qId + '/featured');
+  const itemRef = id ? db.ref('responses/' + code + '/' + qId + '/' + id) : null;
+
+  if (act === 'sort') {
+    controlState.qaSort = btn.dataset.v;
+    renderQABoard(q, controlState.lastRaw || []);
+  } else if (act === 'csv') {
+    exportQACsv(sessionData, q, controlState.lastRaw || []);
+  } else if (act === 'feature' && item) {
+    featRef.set(q.featured === id ? null : id);
+  } else if (act === 'answered' && item) {
+    itemRef.child('answered').set(item.answered ? null : true);
+    if (!item.answered && q.featured === id) featRef.set(null);   /* 回答し終えたらスポットライトも外す */
+  } else if (act === 'hide' && item) {
+    itemRef.child('hidden').set(item.hidden ? null : true);
+    if (!item.hidden && q.featured === id) featRef.set(null);
+  }
+});
+
+/* 時間内に答えきれなかった質問を講師へ送る用。Excelで文字化けしないようBOM付きUTF-8 */
+function exportQACsv(sd, q, raw){
+  const items = sortQA(raw.filter(it => it.text), 'likes');
+  if (items.length === 0) { alert('出力する質問がありません。'); return; }
+  const esc = s => '"' + String(s).replace(/"/g, '""') + '"';
+  const lines = [['No', '質問', 'いいね数', '状態', '投稿時刻'].map(esc).join(',')];
+  items.forEach((it, i) => {
+    const st = it.hidden ? '非表示' : (it.answered ? '回答済み' : '未回答');
+    const t = it.ts ? new Date(it.ts).toLocaleString('ja-JP') : '';
+    lines.push([i + 1, it.text, it.likes, st, t].map(esc).join(','));
+  });
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const d = new Date();
+  const ymd = d.getFullYear() + String(d.getMonth() + 1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
+  const safe = s => String(s || '').replace(/[\\/:*?"<>|]/g, '_').trim();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${safe(sd.title) || '投票'}_質問一覧_${ymd}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
 /* 棒の上に人数を表示する小さなプラグイン（Chart.js 本体にはない機能なので自前で描く） */
@@ -2856,7 +3230,14 @@ function renderChartInner(q, responses){
   const numStats = $('stage-numeric-stats');
   const empty = $('stage-empty');
   canvas.classList.add('hidden'); wcWrap.classList.add('hidden'); numStats.classList.add('hidden');
+  $('qa-board').classList.add('hidden');
   if (controlState.chart) { controlState.chart.destroy(); controlState.chart = null; }
+
+  if (q.type === 'qa') {
+    empty.classList.add('hidden');
+    renderQABoard(q, controlState.lastRaw || []);
+    return;
+  }
 
   if (responses.length === 0) {
     empty.classList.remove('hidden');
